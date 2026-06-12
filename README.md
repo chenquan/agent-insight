@@ -8,255 +8,127 @@ A lightweight pprof analysis CLI designed specifically for Claude Code and other
 - **AI-Friendly Output**: Structured JSON format optimized for LLM parsing
 - **Symbol Fallback**: Gracefully handles production profiles without debug symbols
 - **Multi-Value Support**: Smart defaults for complex profile types (Go heap, etc.)
-- **Multiple Formats**: Text, JSON, and Markdown output
 - **Eight Core Commands**: analyze, list, flame, diff, info, traces, tree, init
 
 ## Installation
 
 ```bash
-# Build from source
+# From source (binary at ./agent-insight)
 make build
 
-# The binary will be at: ./build/agent-insight
+# Or via go install (requires Go 1.26+)
+go install github.com/chenquan/agent-insight@latest
 ```
 
 ## Usage
 
-### init - Generate Claude Code skill
+### info - Show profile metadata
 
 ```bash
-# Generate SKILL.md for current project
-agent-insight init
-
-# Overwrite existing skill file
-agent-insight init --force
+agent-insight info profile.pb.gz
+agent-insight info cpu.pb.gz --format json
 ```
 
-Generates `.claude/skills/agent-insight/SKILL.md` in the current directory. After running this command, Claude Code will automatically recognize performance analysis scenarios and use agent-insight appropriately.
+Zero-computation overview: type, duration, sample count, value types, symbol status, mappings.
 
 ### analyze - Analyze performance hotspots
 
 ```bash
-# Basic analysis
 agent-insight analyze profile.pb.gz
-
-# Top 20 hotspots, sorted by cumulative value
 agent-insight analyze profile.pb.gz --top 20 --cum
-
-# JSON output with filtering
 agent-insight analyze profile.pb.gz --format json --focus "runtime.*"
-
-# Include collapsed stacks for flame graph generation
-agent-insight analyze profile.pb.gz --collapse
-
-# Custom call stack depth
-agent-insight analyze profile.pb.gz --call-depth 10
+agent-insight analyze profile.pb.gz --collapse              # include folded stacks
 ```
 
 ### list - Query function call relationships
 
 ```bash
-# List functions matching a pattern
 agent-insight list profile.pb.gz "main.*"
-
-# Show only callers
 agent-insight list profile.pb.gz "runtime.mallocgc" --callers-only
-
-# JSON output with depth limit
 agent-insight list profile.pb.gz "encoding.*" --depth 3 --format json
-
-# Exclude runtime functions
-agent-insight list profile.pb.gz "main.*" --exclude "runtime.*"
 ```
 
 ### flame - Generate folded stack format
 
 ```bash
-# Generate collapsed stacks
 agent-insight flame profile.pb.gz > stacks.folded
-
-# With filtering and stats
 agent-insight flame profile.pb.gz --focus "encoding.*" --stats
-
-# Limit depth and top stacks
-agent-insight flame profile.pb.gz --depth 10 --top 50
-
-# Pipe to flamegraph tool
 agent-insight flame profile.pb.gz | flamegraph.pl > graph.svg
+```
+
+### traces - Show individual sample call traces
+
+```bash
+agent-insight traces profile.pb.gz
+agent-insight traces profile.pb.gz --focus "runtime.*" --top 10
+```
+
+Complements flame's aggregated view with per-sample call chains.
+
+### tree - Show hierarchical call tree
+
+```bash
+agent-insight tree profile.pb.gz
+agent-insight tree profile.pb.gz --depth 3 --top 5 --focus "main.*"
 ```
 
 ### diff - Compare two profiles
 
 ```bash
-# Compare profiles
 agent-insight diff before.prof after.prof
-
-# With minimum delta threshold
-agent-insight diff base.prof target.prof --min-delta 10
-
-# Focus on specific package
-agent-insight diff base.prof target.prof --focus "runtime.*" --format json
-
-# Hide new/deleted functions
+agent-insight diff base.prof target.prof --min-delta 10 --format json
 agent-insight diff base.prof target.prof --hide-new --hide-deleted
 ```
 
-### info - Show profile metadata
+### init - Generate Claude Code skill
 
 ```bash
-# Quick overview
-agent-insight info profile.pb.gz
-
-# JSON output
-agent-insight info cpu.pb.gz --format json
-
-# Markdown output
-agent-insight info heap.pb.gz --format markdown
+agent-insight init          # generate .claude/skills/agent-insight/SKILL.md
+agent-insight init --force  # overwrite existing
 ```
 
-Zero-computation overview: profile type, duration, sample count, value types, symbol status, mappings.
+## Output Formats
 
-### traces - Show sample call traces
+All commands support `--format text|json|markdown`. JSON is recommended for LLM consumption.
 
-```bash
-# Show all traces
-agent-insight traces profile.pb.gz
+## Filtering
 
-# Focus on specific functions
-agent-insight traces profile.pb.gz --focus "runtime.*"
-
-# Limit output and ignore runtime
-agent-insight traces profile.pb.gz --ignore "runtime.*" --top 10
-
-# JSON output
-agent-insight traces cpu.pb.gz --format json
-```
-
-Displays individual sample call chains (root to leaf) with values. Complements flame's aggregated view.
-
-### tree - Show hierarchical call tree
+Most commands support `--focus <regex>` and `--ignore <regex>`:
 
 ```bash
-# Show call tree
-agent-insight tree profile.pb.gz
-
-# Limit depth and children
-agent-insight tree profile.pb.gz --depth 3 --top 5
-
-# Focus on specific package
-agent-insight tree profile.pb.gz --focus "main.*"
-
-# JSON output
-agent-insight tree cpu.pb.gz --format json
-```
-
-Builds a hierarchical call tree from root to leaf with flat/cumulative values at each level.
-
-### Output Formats
-
-All commands support `--format text|json|markdown`:
-
-```bash
-# JSON output (AI-friendly)
-agent-insight analyze profile.pb.gz --format json
-
-# Markdown output
-agent-insight analyze profile.pb.gz --format markdown
-
-# Text output (default)
-agent-insight analyze profile.pb.gz
-```
-
-### Filtering
-
-```bash
-# Focus on specific functions
-agent-insight analyze profile.pb.gz --focus "runtime.*"
-
-# Ignore specific functions
-agent-insight analyze profile.pb.gz --ignore "runtime.*"
-
-# Combine both
 agent-insight analyze profile.pb.gz --focus "main.*" --ignore "runtime.*"
 ```
 
-### Profile Types
+## Profile Types
 
-Supports various profile types:
-- CPU profiles
-- Heap profiles (allocations, in-use memory)
-- Goroutine profiles
-- Contention profiles
-- Custom profile types
+Supports CPU, heap (alloc/inuse × objects/space), goroutine, contention, and custom types. Use `--value-type` to select among multiple value types in heap profiles.
 
-## Output Examples
-
-### JSON Output
+## JSON Output Example
 
 ```json
 {
   "type": "cpu",
   "duration": "30s",
-  "samples": 69,
+  "samples": 5,
   "sample_types": ["samples/count", "cpu/nanoseconds"],
   "top": [
     {
       "function": "runtime.mallocgc",
-      "file": "runtime/malloc.go:1020",
-      "flat": 85,
-      "flat_percent": 40.28,
-      "cum": 85,
-      "cum_percent": 40.28
+      "flat": 500,
+      "flat_percent": 45.45,
+      "cum": 500,
+      "cum_percent": 45.45
     }
   ],
-  "summary": "Profile type: cpu. Total samples: 69. Top hotspot: runtime.mallocgc (40.28%)."
+  "summary": "Profile type: cpu. Total samples: 5. Top hotspot: runtime.mallocgc (45.45%)."
 }
 ```
 
-### Handling Missing Symbols
-
-When profiles lack symbol information (common in production):
+When symbols are missing, hotspots fall back to address/module:
 
 ```json
-{
-  "top": [
-    {
-      "location_id": 9,
-      "address": "0x430bac",
-      "module": "/usr/bin/myapp",
-      "flat": 85,
-      "flat_percent": 40.28
-    }
-  ],
-  "summary": "Limited symbol information available (0% of top functions)"
-}
+{ "location_id": 9, "address": "0x430bac", "module": "/usr/bin/myapp", "flat": 85, "flat_percent": 40.28 }
 ```
-
-## Design Principles
-
-1. **AI-First**: Structured output optimized for LLM consumption
-2. **Production-Ready**: Handles profiles without debug symbols
-3. **Lightweight**: Single binary, no Python/Node.js dependencies
-4. **Compatible**: Works with `go tool pprof` generated files
-
-## Development
-
-```bash
-# Build
-make build
-
-# Run tests
-make test
-
-# Clean build artifacts
-make clean
-```
-
-## Compatibility
-
-- Requires Go 1.26+
-- Compatible with pprof protobuf format (.pb.gz and .pb)
-- Tested with profiles from Go applications
 
 ## License
 
