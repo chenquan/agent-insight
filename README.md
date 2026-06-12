@@ -16,7 +16,7 @@ A lightweight pprof analysis CLI designed specifically for Claude Code and other
 # From source (binary at ./agent-insight)
 make build
 
-# Or via go install (requires Go 1.26+)
+# Or via go install (requires Go 1.24+)
 go install github.com/chenquan/agent-insight@latest
 ```
 
