@@ -9,7 +9,7 @@ A lightweight pprof analysis CLI designed specifically for Claude Code and other
 - **Symbol Fallback**: Gracefully handles production profiles without debug symbols
 - **Multi-Value Support**: Smart defaults for complex profile types (Go heap, etc.)
 - **Multiple Formats**: Text, JSON, and Markdown output
-- **Four Core Commands**: analyze, list, flame, diff
+- **Five Core Commands**: analyze, list, flame, diff, init
 
 ## Installation
 
@@ -21,6 +21,18 @@ make build
 ```
 
 ## Usage
+
+### init - Generate Claude Code skill
+
+```bash
+# Generate SKILL.md for current project
+agent-insight init
+
+# Overwrite existing skill file
+agent-insight init --force
+```
+
+Generates `.claude/skills/agent-insight/SKILL.md` in the current directory. After running this command, Claude Code will automatically recognize performance analysis scenarios and use agent-insight appropriately.
 
 ### analyze - Analyze performance hotspots
 
