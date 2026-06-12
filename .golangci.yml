@@ -1,0 +1,18 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - staticcheck
+    - govet
+
+issues:
+  exclude-rules:
+    # fmt.Fprintf to io.Writer: ignoring errors is standard practice
+    - linters:
+        - errcheck
+      text: "Error return value of `fmt.Fprint"
+    # defer Close() on ReadCloser: ignoring error is standard practice
+    - linters:
+        - errcheck
+      text: "Error return value of `.*Close`"

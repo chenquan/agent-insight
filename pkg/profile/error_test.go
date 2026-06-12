@@ -9,7 +9,9 @@ import (
 func TestErrorLoadInvalidFile(t *testing.T) {
 	dir := t.TempDir()
 	invalidPath := filepath.Join(dir, "invalid.pb.gz")
-	os.WriteFile(invalidPath, []byte("not a valid profile"), 0644)
+	if err := os.WriteFile(invalidPath, []byte("not a valid profile"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	loader := NewLoader()
 	_, err := loader.LoadFromFile(invalidPath)
@@ -21,7 +23,9 @@ func TestErrorLoadInvalidFile(t *testing.T) {
 func TestErrorLoadEmptyFile(t *testing.T) {
 	dir := t.TempDir()
 	emptyPath := filepath.Join(dir, "empty.pb.gz")
-	os.WriteFile(emptyPath, []byte{}, 0644)
+	if err := os.WriteFile(emptyPath, []byte{}, 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	loader := NewLoader()
 	_, err := loader.LoadFromFile(emptyPath)

@@ -287,7 +287,7 @@ func generateSummary(analysis *profile.Analysis) string {
 
 		// Add concentration info if top function dominates
 		if top.FlatPercent > 30 {
-			parts = append(parts, fmt.Sprintf("Highly concentrated performance bottleneck"))
+			parts = append(parts, "Highly concentrated performance bottleneck")
 		}
 	}
 

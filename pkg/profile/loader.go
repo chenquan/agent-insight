@@ -27,7 +27,7 @@ func (l *Loader) LoadFromFile(path string) (*profile.Profile, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open profile file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	return l.ParseFromReader(file, path)
 }
@@ -35,7 +35,7 @@ func (l *Loader) LoadFromFile(path string) (*profile.Profile, error) {
 // ParseFromReader parses a profile from an io.Reader
 // The filename is used to determine if gzip decompression should be applied
 func (l *Loader) ParseFromReader(r io.Reader, filename string) (*profile.Profile, error) {
-	var reader io.Reader = r
+	var reader = r
 
 	// Check if the file is gzipped by extension
 	if strings.HasSuffix(filename, ".gz") {
@@ -43,7 +43,7 @@ func (l *Loader) ParseFromReader(r io.Reader, filename string) (*profile.Profile
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
 		}
-		defer gzReader.Close()
+		defer func() { _ = gzReader.Close() }()
 		reader = gzReader
 	}
 
