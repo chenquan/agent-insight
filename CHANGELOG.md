@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **init command**: Generate Claude Code skill file for agent-insight
+  - Generates `.claude/skills/agent-insight/SKILL.md` with embedded usage guide
+  - Includes trigger conditions, command reference, workflows, and output interpretation
+  - Supports `--force` flag to overwrite existing skill file
+
 ## [0.1.0] - 2026-06-13
 
 ### Added
