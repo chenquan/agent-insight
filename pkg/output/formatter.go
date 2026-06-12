@@ -516,6 +516,210 @@ func (f *ListMarkdownFormatter) FormatListResult(result *profile.ListResult) err
 	return nil
 }
 
+// InfoTextFormatter formats info results in text format
+type InfoTextFormatter struct {
+	writer io.Writer
+}
+
+func NewInfoTextFormatter(w io.Writer) *InfoTextFormatter {
+	return &InfoTextFormatter{writer: w}
+}
+
+func (f *InfoTextFormatter) FormatInfoResult(result *profile.InfoResult) error {
+	fmt.Fprintf(f.writer, "Profile Info\n")
+	fmt.Fprintf(f.writer, "============\n\n")
+
+	fmt.Fprintf(f.writer, "Type:     %s\n", result.Type)
+	if result.Duration > 0 {
+		fmt.Fprintf(f.writer, "Duration: %s\n", result.Duration)
+	}
+	if result.Period > 0 && result.PeriodType != "" {
+		fmt.Fprintf(f.writer, "Period:   %d (%s)\n", result.Period, result.PeriodType)
+	}
+	fmt.Fprintf(f.writer, "Samples:  %d\n", result.SampleCount)
+	fmt.Fprintf(f.writer, "Functions: %d\n", result.Functions)
+	fmt.Fprintf(f.writer, "Locations: %d\n", result.Locations)
+
+	if len(result.ValueTypes) > 0 {
+		fmt.Fprintf(f.writer, "\nValue Types:\n")
+		for _, vt := range result.ValueTypes {
+			fmt.Fprintf(f.writer, "  %s/%s\n", vt.Type, vt.Unit)
+		}
+	}
+
+	fmt.Fprintf(f.writer, "\nSymbols: ")
+	if result.HasSymbols {
+		fmt.Fprintf(f.writer, "available")
+	} else {
+		fmt.Fprintf(f.writer, "unavailable")
+	}
+	if result.HasFileLines {
+		fmt.Fprintf(f.writer, " (file/lines: available)")
+	}
+	fmt.Fprintf(f.writer, "\n")
+
+	if result.TimeRange.HasTime {
+		fmt.Fprintf(f.writer, "\nTime Range:\n")
+		fmt.Fprintf(f.writer, "  Start: %s\n", result.TimeRange.Start.Format("2006-01-02 15:04:05"))
+		fmt.Fprintf(f.writer, "  End:   %s\n", result.TimeRange.End.Format("2006-01-02 15:04:05"))
+	}
+
+	if len(result.Mappings) > 0 {
+		fmt.Fprintf(f.writer, "\nMappings (%d):\n", len(result.Mappings))
+		for _, m := range result.Mappings {
+			fmt.Fprintf(f.writer, "  %s", m.File)
+			if m.BuildID != "" {
+				fmt.Fprintf(f.writer, " (buildID: %s)", m.BuildID)
+			}
+			features := []string{}
+			if m.HasFunctions {
+				features = append(features, "functions")
+			}
+			if m.HasFilenames {
+				features = append(features, "filenames")
+			}
+			if m.HasLineNumbers {
+				features = append(features, "lines")
+			}
+			if m.HasInlineFrames {
+				features = append(features, "inline")
+			}
+			if len(features) > 0 {
+				fmt.Fprintf(f.writer, " [%s]", strings.Join(features, ", "))
+			}
+			fmt.Fprintf(f.writer, "\n")
+		}
+	}
+
+	if len(result.Comments) > 0 {
+		fmt.Fprintf(f.writer, "\nComments:\n")
+		for _, c := range result.Comments {
+			fmt.Fprintf(f.writer, "  %s\n", c)
+		}
+	}
+
+	return nil
+}
+
+// InfoJSONFormatter formats info results in JSON format
+type InfoJSONFormatter struct {
+	writer io.Writer
+}
+
+func NewInfoJSONFormatter(w io.Writer) *InfoJSONFormatter {
+	return &InfoJSONFormatter{writer: w}
+}
+
+func (f *InfoJSONFormatter) FormatInfoResult(result *profile.InfoResult) error {
+	output := map[string]interface{}{
+		"type":           result.Type,
+		"duration":       result.Duration.String(),
+		"period":         result.Period,
+		"period_type":    result.PeriodType,
+		"samples":        result.SampleCount,
+		"functions":      result.Functions,
+		"locations":      result.Locations,
+		"has_symbols":    result.HasSymbols,
+		"has_file_lines": result.HasFileLines,
+		"value_types":    result.ValueTypes,
+	}
+
+	if result.TimeRange.HasTime {
+		output["time_range"] = map[string]string{
+			"start": result.TimeRange.Start.Format(time.RFC3339),
+			"end":   result.TimeRange.End.Format(time.RFC3339),
+		}
+	}
+
+	if len(result.Mappings) > 0 {
+		output["mappings"] = result.Mappings
+	}
+
+	if len(result.Comments) > 0 {
+		output["comments"] = result.Comments
+	}
+
+	encoder := json.NewEncoder(f.writer)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(output)
+}
+
+// InfoMarkdownFormatter formats info results in Markdown format
+type InfoMarkdownFormatter struct {
+	writer io.Writer
+}
+
+func NewInfoMarkdownFormatter(w io.Writer) *InfoMarkdownFormatter {
+	return &InfoMarkdownFormatter{writer: w}
+}
+
+func (f *InfoMarkdownFormatter) FormatInfoResult(result *profile.InfoResult) error {
+	fmt.Fprintf(f.writer, "# Profile Info\n\n")
+
+	fmt.Fprintf(f.writer, "| Property | Value |\n")
+	fmt.Fprintf(f.writer, "|----------|-------|\n")
+	fmt.Fprintf(f.writer, "| Type | %s |\n", result.Type)
+	if result.Duration > 0 {
+		fmt.Fprintf(f.writer, "| Duration | %s |\n", result.Duration)
+	}
+	if result.Period > 0 && result.PeriodType != "" {
+		fmt.Fprintf(f.writer, "| Period | %d (%s) |\n", result.Period, result.PeriodType)
+	}
+	fmt.Fprintf(f.writer, "| Samples | %d |\n", result.SampleCount)
+	fmt.Fprintf(f.writer, "| Functions | %d |\n", result.Functions)
+	fmt.Fprintf(f.writer, "| Locations | %d |\n", result.Locations)
+	fmt.Fprintf(f.writer, "| Symbols | %v |\n", result.HasSymbols)
+	fmt.Fprintf(f.writer, "| File/Lines | %v |\n", result.HasFileLines)
+
+	if len(result.ValueTypes) > 0 {
+		fmt.Fprintf(f.writer, "\n## Value Types\n\n")
+		fmt.Fprintf(f.writer, "| Type | Unit |\n")
+		fmt.Fprintf(f.writer, "|------|------|\n")
+		for _, vt := range result.ValueTypes {
+			fmt.Fprintf(f.writer, "| %s | %s |\n", vt.Type, vt.Unit)
+		}
+	}
+
+	if result.TimeRange.HasTime {
+		fmt.Fprintf(f.writer, "\n## Time Range\n\n")
+		fmt.Fprintf(f.writer, "| Property | Value |\n")
+		fmt.Fprintf(f.writer, "|----------|-------|\n")
+		fmt.Fprintf(f.writer, "| Start | %s |\n", result.TimeRange.Start.Format("2006-01-02 15:04:05"))
+		fmt.Fprintf(f.writer, "| End | %s |\n", result.TimeRange.End.Format("2006-01-02 15:04:05"))
+	}
+
+	if len(result.Mappings) > 0 {
+		fmt.Fprintf(f.writer, "\n## Mappings\n\n")
+		fmt.Fprintf(f.writer, "| File | Build ID | Features |\n")
+		fmt.Fprintf(f.writer, "|------|----------|----------|\n")
+		for _, m := range result.Mappings {
+			features := []string{}
+			if m.HasFunctions {
+				features = append(features, "functions")
+			}
+			if m.HasFilenames {
+				features = append(features, "filenames")
+			}
+			if m.HasLineNumbers {
+				features = append(features, "lines")
+			}
+			if m.HasInlineFrames {
+				features = append(features, "inline")
+			}
+			fmt.Fprintf(f.writer, "| `%s` | %s | %s |\n", m.File, m.BuildID, strings.Join(features, ", "))
+		}
+	}
+
+	if len(result.Comments) > 0 {
+		fmt.Fprintf(f.writer, "\n## Comments\n\n")
+		for _, c := range result.Comments {
+			fmt.Fprintf(f.writer, "- %s\n", c)
+		}
+	}
+
+	return nil
+}
+
 // FlameFormatter formats flame results in folded stack format
 type FlameFormatter struct {
 	writer io.Writer
@@ -537,6 +741,208 @@ func (f *FlameFormatter) FormatFlameResult(result *profile.FlameResult) error {
 // DiffFormatter interface for diff command output
 type DiffFormatter interface {
 	FormatDiffResult(result *profile.DiffResult, base, target string) error
+}
+
+// TreeTextFormatter formats tree results in text format
+type TreeTextFormatter struct {
+	writer io.Writer
+}
+
+func NewTreeTextFormatter(w io.Writer) *TreeTextFormatter {
+	return &TreeTextFormatter{writer: w}
+}
+
+func (f *TreeTextFormatter) FormatTreeResult(result *profile.TreeResult) error {
+	fmt.Fprintf(f.writer, "Call Tree (Value Type: %s)\n", result.ValueType)
+	fmt.Fprintf(f.writer, "%s\n\n", strings.Repeat("=", 50))
+
+	for _, child := range result.VisibleChildren() {
+		f.formatNode(child, 0, 5)
+	}
+
+	return nil
+}
+
+func (f *TreeTextFormatter) formatNode(node *profile.CallTreeNode, depth, maxDepth int) {
+	if depth >= maxDepth {
+		return
+	}
+
+	indent := strings.Repeat("  ", depth)
+	fmt.Fprintf(f.writer, "%s%s  flat: %d (%.2f%%)  cum: %d (%.2f%%)\n",
+		indent, node.Name, node.Flat, node.FlatPercent, node.Cum, node.CumPercent)
+
+	for _, child := range node.Children {
+		f.formatNode(child, depth+1, maxDepth)
+	}
+}
+
+// TreeJSONFormatter formats tree results in JSON format
+type TreeJSONFormatter struct {
+	writer io.Writer
+}
+
+func NewTreeJSONFormatter(w io.Writer) *TreeJSONFormatter {
+	return &TreeJSONFormatter{writer: w}
+}
+
+func (f *TreeJSONFormatter) FormatTreeResult(result *profile.TreeResult) error {
+	type jsonNode struct {
+		Name        string      `json:"name"`
+		Flat        int64       `json:"flat"`
+		FlatPercent float64     `json:"flat_percent"`
+		Cum         int64       `json:"cum"`
+		CumPercent  float64     `json:"cum_percent"`
+		Children    []*jsonNode `json:"children,omitempty"`
+	}
+
+	var convertNode func(n *profile.CallTreeNode) *jsonNode
+	convertNode = func(n *profile.CallTreeNode) *jsonNode {
+		jn := &jsonNode{
+			Name:        n.Name,
+			Flat:        n.Flat,
+			FlatPercent: n.FlatPercent,
+			Cum:         n.Cum,
+			CumPercent:  n.CumPercent,
+		}
+		for _, child := range n.Children {
+			jn.Children = append(jn.Children, convertNode(child))
+		}
+		return jn
+	}
+
+	children := make([]*jsonNode, len(result.VisibleChildren()))
+	for i, child := range result.VisibleChildren() {
+		children[i] = convertNode(child)
+	}
+
+	output := map[string]interface{}{
+		"value_type": result.ValueType,
+		"tree":       children,
+	}
+
+	encoder := json.NewEncoder(f.writer)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(output)
+}
+
+// TreeMarkdownFormatter formats tree results in Markdown format
+type TreeMarkdownFormatter struct {
+	writer io.Writer
+}
+
+func NewTreeMarkdownFormatter(w io.Writer) *TreeMarkdownFormatter {
+	return &TreeMarkdownFormatter{writer: w}
+}
+
+func (f *TreeMarkdownFormatter) FormatTreeResult(result *profile.TreeResult) error {
+	fmt.Fprintf(f.writer, "# Call Tree\n\n")
+	fmt.Fprintf(f.writer, "**Value Type:** %s\n\n", result.ValueType)
+
+	for _, child := range result.VisibleChildren() {
+		f.formatNode(child, 0, 5)
+	}
+
+	return nil
+}
+
+func (f *TreeMarkdownFormatter) formatNode(node *profile.CallTreeNode, depth, maxDepth int) {
+	if depth >= maxDepth {
+		return
+	}
+
+	indent := strings.Repeat("  ", depth)
+	fmt.Fprintf(f.writer, "%s- `%s` — flat: %d (%.2f%%), cum: %d (%.2f%%)\n",
+		indent, node.Name, node.Flat, node.FlatPercent, node.Cum, node.CumPercent)
+
+	for _, child := range node.Children {
+		f.formatNode(child, depth+1, maxDepth)
+	}
+}
+
+// TracesTextFormatter formats traces results in text format
+type TracesTextFormatter struct {
+	writer io.Writer
+}
+
+func NewTracesTextFormatter(w io.Writer) *TracesTextFormatter {
+	return &TracesTextFormatter{writer: w}
+}
+
+func (f *TracesTextFormatter) FormatTracesResult(result *profile.TracesResult) error {
+	fmt.Fprintf(f.writer, "Traces (%d shown / %d total)\n", result.ShownTraces, result.TotalTraces)
+	fmt.Fprintf(f.writer, "Value Type: %s\n\n", result.ValueType)
+
+	for i, trace := range result.Traces {
+		fmt.Fprintf(f.writer, "Trace #%d  Value: %d (%.2f%%)\n", i+1, trace.Value, trace.Percent)
+		for j, fn := range trace.Stack {
+			fmt.Fprintf(f.writer, "  %s%s\n", strings.Repeat("  ", j), fn)
+		}
+		fmt.Fprintf(f.writer, "\n")
+	}
+
+	return nil
+}
+
+// TracesJSONFormatter formats traces results in JSON format
+type TracesJSONFormatter struct {
+	writer io.Writer
+}
+
+func NewTracesJSONFormatter(w io.Writer) *TracesJSONFormatter {
+	return &TracesJSONFormatter{writer: w}
+}
+
+func (f *TracesJSONFormatter) FormatTracesResult(result *profile.TracesResult) error {
+	type jsonTrace struct {
+		Stack   []string `json:"stack"`
+		Value   int64    `json:"value"`
+		Percent float64  `json:"percent"`
+	}
+
+	traces := make([]jsonTrace, len(result.Traces))
+	for i, t := range result.Traces {
+		traces[i] = jsonTrace{
+			Stack:   t.Stack,
+			Value:   t.Value,
+			Percent: t.Percent,
+		}
+	}
+
+	output := map[string]interface{}{
+		"value_type":   result.ValueType,
+		"total_traces": result.TotalTraces,
+		"shown_traces": result.ShownTraces,
+		"traces":       traces,
+	}
+
+	encoder := json.NewEncoder(f.writer)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(output)
+}
+
+// TracesMarkdownFormatter formats traces results in Markdown format
+type TracesMarkdownFormatter struct {
+	writer io.Writer
+}
+
+func NewTracesMarkdownFormatter(w io.Writer) *TracesMarkdownFormatter {
+	return &TracesMarkdownFormatter{writer: w}
+}
+
+func (f *TracesMarkdownFormatter) FormatTracesResult(result *profile.TracesResult) error {
+	fmt.Fprintf(f.writer, "# Traces (%d shown / %d total)\n\n", result.ShownTraces, result.TotalTraces)
+	fmt.Fprintf(f.writer, "**Value Type:** %s\n\n", result.ValueType)
+
+	for i, trace := range result.Traces {
+		fmt.Fprintf(f.writer, "## Trace #%d — Value: %d (%.2f%%)\n\n", i+1, trace.Value, trace.Percent)
+		for j, fn := range trace.Stack {
+			fmt.Fprintf(f.writer, "%s- `%s`\n", strings.Repeat("  ", j), fn)
+		}
+		fmt.Fprintf(f.writer, "\n")
+	}
+
+	return nil
 }
 
 // DiffTextFormatter formats diff results in text format

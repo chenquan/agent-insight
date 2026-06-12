@@ -22,7 +22,10 @@ Core commands:
   analyze  - Analyze pprof files and output performance hotspots
   list     - Query specific function call relationships
   flame    - Generate folded stack format for flame graphs
-  diff     - Compare two profiles to identify performance changes`,
+  diff     - Compare two profiles to identify performance changes
+  info     - Show profile metadata overview
+  traces   - Show individual sample call traces
+  tree     - Show hierarchical call tree`,
 	Version: "0.1.0",
 }
 
@@ -41,6 +44,9 @@ func init() {
 	rootCmd.AddCommand(commands.ListCmd)
 	rootCmd.AddCommand(commands.FlameCmd)
 	rootCmd.AddCommand(commands.DiffCmd)
+	rootCmd.AddCommand(commands.InfoCmd)
+	rootCmd.AddCommand(commands.TracesCmd)
+	rootCmd.AddCommand(commands.TreeCmd)
 	rootCmd.AddCommand(commands.InitCmd)
 
 	// Here you will define your flags and configuration settings.

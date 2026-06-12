@@ -9,7 +9,7 @@ A lightweight pprof analysis CLI designed specifically for Claude Code and other
 - **Symbol Fallback**: Gracefully handles production profiles without debug symbols
 - **Multi-Value Support**: Smart defaults for complex profile types (Go heap, etc.)
 - **Multiple Formats**: Text, JSON, and Markdown output
-- **Five Core Commands**: analyze, list, flame, diff, init
+- **Eight Core Commands**: analyze, list, flame, diff, info, traces, tree, init
 
 ## Installation
 
@@ -100,6 +100,57 @@ agent-insight diff base.prof target.prof --focus "runtime.*" --format json
 # Hide new/deleted functions
 agent-insight diff base.prof target.prof --hide-new --hide-deleted
 ```
+
+### info - Show profile metadata
+
+```bash
+# Quick overview
+agent-insight info profile.pb.gz
+
+# JSON output
+agent-insight info cpu.pb.gz --format json
+
+# Markdown output
+agent-insight info heap.pb.gz --format markdown
+```
+
+Zero-computation overview: profile type, duration, sample count, value types, symbol status, mappings.
+
+### traces - Show sample call traces
+
+```bash
+# Show all traces
+agent-insight traces profile.pb.gz
+
+# Focus on specific functions
+agent-insight traces profile.pb.gz --focus "runtime.*"
+
+# Limit output and ignore runtime
+agent-insight traces profile.pb.gz --ignore "runtime.*" --top 10
+
+# JSON output
+agent-insight traces cpu.pb.gz --format json
+```
+
+Displays individual sample call chains (root to leaf) with values. Complements flame's aggregated view.
+
+### tree - Show hierarchical call tree
+
+```bash
+# Show call tree
+agent-insight tree profile.pb.gz
+
+# Limit depth and children
+agent-insight tree profile.pb.gz --depth 3 --top 5
+
+# Focus on specific package
+agent-insight tree profile.pb.gz --focus "main.*"
+
+# JSON output
+agent-insight tree cpu.pb.gz --format json
+```
+
+Builds a hierarchical call tree from root to leaf with flat/cumulative values at each level.
 
 ### Output Formats
 
