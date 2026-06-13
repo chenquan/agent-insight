@@ -183,7 +183,8 @@ func findMatchingFunctions(p *profile.Profile, pattern, exclude *regexp.Regexp, 
 				extractSymbolInfoForLocation(loc, &info)
 				info.LocationID = &locID
 				if loc.Mapping != nil && loc.Mapping.File != "" {
-					info.Module = &loc.Mapping.File
+					mod := normalizeMappingFile(loc.Mapping.File)
+					info.Module = &mod
 				}
 				funcInfos[locID] = info
 			}
@@ -261,7 +262,8 @@ func buildCallRelationship(loc *profile.Location, value int64, p *profile.Profil
 		addr := fmt.Sprintf("0x%x", loc.Address)
 		rel.Address = &addr
 		if loc.Mapping != nil && loc.Mapping.File != "" {
-			rel.Module = &loc.Mapping.File
+			mod := normalizeMappingFile(loc.Mapping.File)
+			rel.Module = &mod
 		}
 	}
 

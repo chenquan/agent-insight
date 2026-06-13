@@ -1,4 +1,4 @@
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Compare two profile files
 The system SHALL accept two profile files as input and compare their performance characteristics.

@@ -291,7 +291,8 @@ func extractDeltaSymbolInfo(p *profile.Profile, locID uint64, delta *FunctionDel
 	delta.Address = &addr
 
 	if loc.Mapping != nil && loc.Mapping.File != "" {
-		delta.Module = &loc.Mapping.File
+		mod := normalizeMappingFile(loc.Mapping.File)
+		delta.Module = &mod
 	}
 }
 

@@ -738,6 +738,80 @@ func (f *FlameFormatter) FormatFlameResult(result *profile.FlameResult) error {
 	return nil
 }
 
+// Format dispatches to the appropriate format method based on the format string.
+func (f *FlameFormatter) Format(result *profile.FlameResult, format string) error {
+	switch format {
+	case "json":
+		return f.formatJSON(result)
+	case "markdown":
+		return f.formatMarkdown(result)
+	default:
+		return f.FormatFlameResult(result)
+	}
+}
+
+// flameJSONOutput is the JSON output structure for flame results.
+type flameJSONOutput struct {
+	TotalStacks    int              `json:"total_stacks"`
+	FilteredStacks int              `json:"filtered_stacks,omitempty"`
+	UniqueStacks   int              `json:"unique_stacks"`
+	Stacks         []flameJSONStack `json:"stacks"`
+}
+
+type flameJSONStack struct {
+	Stack []string `json:"stack"`
+	Value int64    `json:"value"`
+}
+
+func (f *FlameFormatter) formatJSON(result *profile.FlameResult) error {
+	output := flameJSONOutput{
+		TotalStacks:    result.TotalStacks,
+		FilteredStacks: result.FilteredStacks,
+		UniqueStacks:   result.UniqueStacks,
+		Stacks:         make([]flameJSONStack, len(result.Stacks)),
+	}
+	for i, s := range result.Stacks {
+		output.Stacks[i] = flameJSONStack{
+			Stack: strings.Split(s.Stack, ";"),
+			Value: s.Count,
+		}
+	}
+	encoder := json.NewEncoder(f.writer)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(output)
+}
+
+func (f *FlameFormatter) formatMarkdown(result *profile.FlameResult) error {
+	fmt.Fprintf(f.writer, "# Flame Graph Data\n\n")
+	fmt.Fprintf(f.writer, "| Metric | Value |\n|---|---|\n")
+	fmt.Fprintf(f.writer, "| Total Stacks | %d |\n", result.TotalStacks)
+	if result.FilteredStacks > 0 {
+		fmt.Fprintf(f.writer, "| Filtered Stacks | %d |\n", result.FilteredStacks)
+	}
+	fmt.Fprintf(f.writer, "| Unique Stacks | %d |\n", result.UniqueStacks)
+	fmt.Fprintf(f.writer, "| Output Stacks | %d |\n\n", len(result.Stacks))
+
+	// Top 20 stacks table
+	limit := 20
+	if len(result.Stacks) < limit {
+		limit = len(result.Stacks)
+	}
+	fmt.Fprintf(f.writer, "## Top %d Stacks\n\n", limit)
+	fmt.Fprintf(f.writer, "| # | Stack | Value |\n|---|---|---|\n")
+	for i := 0; i < limit; i++ {
+		s := result.Stacks[i]
+		fmt.Fprintf(f.writer, "| %d | `%s` | %d |\n", i+1, s.Stack, s.Count)
+	}
+
+	// Full folded stacks in code block
+	fmt.Fprintf(f.writer, "\n## Folded Stacks\n\n```\n")
+	for _, s := range result.Stacks {
+		fmt.Fprintf(f.writer, "%s %d\n", s.Stack, s.Count)
+	}
+	fmt.Fprintf(f.writer, "```\n")
+	return nil
+}
+
 // DiffFormatter interface for diff command output
 type DiffFormatter interface {
 	FormatDiffResult(result *profile.DiffResult, base, target string) error

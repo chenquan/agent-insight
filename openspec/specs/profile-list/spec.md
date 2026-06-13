@@ -1,4 +1,4 @@
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Query function by regex pattern
 The system SHALL allow users to query specific functions using regular expression patterns.

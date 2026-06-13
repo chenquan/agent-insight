@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 
 	"github.com/chenquan/agent-insight/pkg/output"
 	"github.com/chenquan/agent-insight/pkg/profile"
@@ -96,9 +97,25 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 
 	// Apply value type if specified
 	if analyzeValueType != "" {
-		// This will be resolved during analysis based on available value types
-		// Store the requested type name for later validation
-		_ = analyzeValueType // Will be used in analysis
+		found := false
+		for i, st := range p.SampleType {
+			if st.Type == analyzeValueType {
+				config.ValueType = &profile.ValueTypeConfig{
+					Name:  st.Type,
+					Unit:  st.Unit,
+					Index: i,
+				}
+				found = true
+				break
+			}
+		}
+		if !found {
+			var available []string
+			for _, st := range p.SampleType {
+				available = append(available, st.Type+"/"+st.Unit)
+			}
+			return fmt.Errorf("unknown value type %q, available: %s", analyzeValueType, strings.Join(available, ", "))
+		}
 	}
 
 	// Perform analysis

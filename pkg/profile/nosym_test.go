@@ -53,8 +53,8 @@ func TestNoSymbolInfo(t *testing.T) {
 			if h.Address == nil || *h.Address != "0x1234" {
 				t.Errorf("expected address '0x1234', got %v", h.Address)
 			}
-			if h.Module == nil || *h.Module != "/usr/local/bin/myapp" {
-				t.Errorf("expected module '/usr/local/bin/myapp', got %v", h.Module)
+			if h.Module == nil || *h.Module != "myapp" {
+				t.Errorf("expected module 'myapp', got %v", h.Module)
 			}
 		}
 	}

@@ -36,6 +36,7 @@ var (
 	flameTop       int
 	flameValueType string
 	flameStats     bool
+	flameFormat    string
 )
 
 func init() {
@@ -46,10 +47,16 @@ func init() {
 	FlameCmd.Flags().IntVar(&flameTop, "top", 0, "Limit to top N stacks (0 = unlimited)")
 	FlameCmd.Flags().StringVar(&flameValueType, "value-type", "", "Specify which value type to use")
 	FlameCmd.Flags().BoolVar(&flameStats, "stats", false, "Include statistics in output")
+	FlameCmd.Flags().StringVar(&flameFormat, "format", "text", "Output format: text, json, markdown")
 }
 
 func runFlame(cmd *cobra.Command, args []string) error {
 	profilePath := args[0]
+
+	// Validate format
+	if flameFormat != "text" && flameFormat != "json" && flameFormat != "markdown" {
+		return fmt.Errorf("invalid format: %s (must be text, json, or markdown)", flameFormat)
+	}
 
 	// Validate patterns if provided
 	if flameFocus != "" {
@@ -86,13 +93,13 @@ func runFlame(cmd *cobra.Command, args []string) error {
 	}
 
 	// Output statistics if requested
-	if flameStats {
+	if flameStats && flameFormat == "text" {
 		outputFlameStats(result)
 	}
 
-	// Output folded stacks
+	// Output based on format
 	formatter := output.NewFlameFormatter(os.Stdout)
-	return formatter.FormatFlameResult(result)
+	return formatter.Format(result, flameFormat)
 }
 
 // outputFlameStats outputs statistics about the flame generation

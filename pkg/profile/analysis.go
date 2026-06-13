@@ -2,6 +2,7 @@ package profile
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -151,11 +152,40 @@ func extractMetadata(p *profile.Profile) Metadata {
 	}
 
 	// Detect profile type
-	if p.PeriodType != nil {
+	if p.PeriodType != nil && p.PeriodType.Type != "" {
 		metadata.Type = p.PeriodType.Type
+	} else {
+		metadata.Type = inferProfileType(p)
 	}
 
 	return metadata
+}
+
+// inferProfileType infers the profile type from SampleType when PeriodType is missing or empty.
+func inferProfileType(p *profile.Profile) string {
+	for _, st := range p.SampleType {
+		switch st.Type {
+		case "inuse_space", "alloc_space", "inuse_objects", "alloc_objects":
+			return "heap"
+		case "cpu":
+			return "cpu"
+		case "goroutine":
+			return "goroutine"
+		case "contentions":
+			return "contentions"
+		case "thread", "threadcreate":
+			return "thread"
+		}
+	}
+	return "unknown"
+}
+
+// normalizeMappingFile reduces a mapping file path to its basename.
+func normalizeMappingFile(file string) string {
+	if file == "" {
+		return ""
+	}
+	return filepath.Base(file)
 }
 
 // selectDefaultValueType intelligently selects the default value type based on profile type
@@ -317,7 +347,8 @@ func (a *Analysis) calculateHotspots(p *profile.Profile) ([]Hotspot, error) {
 
 				// Extract module info from mapping
 				if loc.Mapping != nil && loc.Mapping.File != "" {
-					hotspot.Module = &loc.Mapping.File
+					mod := normalizeMappingFile(loc.Mapping.File)
+					hotspot.Module = &mod
 				}
 			}
 		}

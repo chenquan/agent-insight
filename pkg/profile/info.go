@@ -95,7 +95,7 @@ func Info(p *profile.Profile) (*InfoResult, error) {
 	// Mappings
 	for _, m := range p.Mapping {
 		result.Mappings = append(result.Mappings, MappingInfo{
-			File:            m.File,
+			File:            normalizeMappingFile(m.File),
 			BuildID:         m.BuildID,
 			HasFunctions:    m.HasFunctions,
 			HasFilenames:    m.HasFilenames,
