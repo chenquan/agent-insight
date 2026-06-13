@@ -1,6 +1,6 @@
 ---
 name: agent-insight
-description: "使用 agent-insight 分析 Go 性能 profile 文件。TRIGGER 当: 用户提到 pprof、性能分析、CPU profiling、内存泄漏、heap 分析、性能热点、火焰图、.pb.gz 文件、goroutine 泄漏、延迟分析、概况、元信息、调用链、执行路径、调用树、层级结构、或想对比 profile 性能差异。"
+description: "使用 agent-insight 分析 pprof 性能 profile 文件。TRIGGER 当: 用户提到 pprof、性能分析、CPU profiling、内存泄漏、heap 分析、性能热点、火焰图、.pb.gz 文件、goroutine 泄漏、延迟分析、概况、元信息、调用链、执行路径、调用树、层级结构、或想对比 profile 性能差异。"
 ---
 
 agent-insight 是一个轻量级 pprof 分析 CLI 工具，专为 AI 编码助手设计。单二进制、零外部依赖，输出结构化 JSON 结果。

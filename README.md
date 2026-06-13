@@ -1,13 +1,13 @@
 # agent-insight
 
-A lightweight pprof analysis CLI designed specifically for Claude Code and other AI coding assistants.
+A lightweight pprof analysis CLI for AI coding assistants. Works with any pprof-compatible profiles — Go, C++, Rust, and more.
 
 ## Features
 
 - **Zero Configuration**: Single binary, no external dependencies
 - **AI-Friendly Output**: Structured JSON format optimized for LLM parsing
 - **Symbol Fallback**: Gracefully handles production profiles without debug symbols
-- **Multi-Value Support**: Smart defaults for complex profile types (Go heap, etc.)
+- **Multi-Value Support**: Smart defaults for complex profile types (Go, C++, etc.)
 - **Eight Core Commands**: analyze, list, flame, diff, info, traces, tree, init
 
 ## Installation
