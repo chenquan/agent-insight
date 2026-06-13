@@ -21,7 +21,7 @@ func TestInitCommand_Generate(t *testing.T) {
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chdir(oldDir)
+	defer func() { _ = os.Chdir(oldDir) }()
 
 	err := InitCmd.Execute()
 	if err != nil {
@@ -46,7 +46,7 @@ func TestInitCommand_FileExistsWithoutForce(t *testing.T) {
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chdir(oldDir)
+	defer func() { _ = os.Chdir(oldDir) }()
 
 	// First generation
 	_, err := skill.Generate(".")
@@ -73,7 +73,7 @@ func TestInitCommand_FileExistsWithForce(t *testing.T) {
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chdir(oldDir)
+	defer func() { _ = os.Chdir(oldDir) }()
 
 	// First generation
 	_, err := skill.Generate(".")
