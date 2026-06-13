@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Diff compares two profiles
 系统 SHALL 比较两个 pprof profile 文件并识别性能变化。

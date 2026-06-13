@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Analysis summary adapts to profile type
 系统 SHALL 在 summary 中使用与 profile 类型匹配的措辞。
