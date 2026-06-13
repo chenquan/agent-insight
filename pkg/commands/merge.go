@@ -37,7 +37,9 @@ var mergeOutput string
 
 func init() {
 	MergeCmd.Flags().StringVarP(&mergeOutput, "output", "o", "", "Output file path (required)")
-	MergeCmd.MarkFlagRequired("output")
+	if err := MergeCmd.MarkFlagRequired("output"); err != nil {
+		panic(fmt.Sprintf("failed to mark output flag as required: %v", err))
+	}
 }
 
 func runMerge(cmd *cobra.Command, args []string) error {
