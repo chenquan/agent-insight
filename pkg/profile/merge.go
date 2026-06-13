@@ -19,7 +19,7 @@ func ValidateAndMerge(profiles []*profile.Profile) (*profile.Profile, *MergeResu
 		return nil, nil, fmt.Errorf("need at least 2 profiles to merge, got %d", len(profiles))
 	}
 
-	if err := validateTypeConsistency(profiles); err != nil {
+	if err := ValidateTypeConsistency(profiles); err != nil {
 		return nil, nil, err
 	}
 
@@ -42,8 +42,8 @@ func ValidateAndMerge(profiles []*profile.Profile) (*profile.Profile, *MergeResu
 	return merged, result, nil
 }
 
-// validateTypeConsistency checks that all profiles have the same PeriodType.
-func validateTypeConsistency(profiles []*profile.Profile) error {
+// ValidateTypeConsistency checks that all profiles have the same PeriodType.
+func ValidateTypeConsistency(profiles []*profile.Profile) error {
 	var knownType string
 
 	for _, p := range profiles {

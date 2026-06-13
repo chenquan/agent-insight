@@ -14,6 +14,7 @@ type InfoResult struct {
 	Period       int64
 	PeriodType   string
 	SampleCount  int
+	TotalValue   int64
 	ValueTypes   []ValueTypeDesc
 	Functions    int
 	Locations    int
@@ -90,6 +91,15 @@ func Info(p *profile.Profile) (*InfoResult, error) {
 		result.TimeRange.Start = time.Unix(0, p.TimeNanos)
 		result.TimeRange.End = result.TimeRange.Start.Add(result.Duration)
 		result.TimeRange.HasTime = true
+	}
+
+	// Goroutine total: sum all sample values for the first value index
+	if p.PeriodType != nil && p.PeriodType.Type == "goroutine" && len(p.Sample) > 0 {
+		for _, s := range p.Sample {
+			if len(s.Value) > 0 {
+				result.TotalValue += s.Value[0]
+			}
+		}
 	}
 
 	// Mappings

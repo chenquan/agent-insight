@@ -52,7 +52,7 @@ main.go
 - 测试数据：`testdata/cpu.pb.gz` 和 `testdata/heap.pb.gz`（由 `testdata/generate.go` 生成）
 - 单测试：`go test -v -run TestName ./pkg/profile/`
 - benchmark：`go test -bench=. ./pkg/profile/`
-
+- **测试数据源**：`github.com/google/pprof@v0.0.0-20260604005048-7023385849c0/profile/testdata`
 ## 技能集成
 
 `pkg/skill/template.md` 是 `init` 命令嵌入的模板，生成 `.claude/skills/agent-insight/SKILL.md`。**新增子命令时必须同步更新这个模板**，否则 Claude Code 不会知道新命令的存在。

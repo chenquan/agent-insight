@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"time"
 
@@ -129,6 +130,7 @@ type JSONHotspot struct {
 	LocationID  *uint64 `json:"location_id,omitempty"`
 	Address     *string `json:"address,omitempty"`
 	Module      *string `json:"module,omitempty"`
+	Unit        string  `json:"unit"`
 	Flat        int64   `json:"flat"`
 	FlatPercent float64 `json:"flat_percent"`
 	Cum         int64   `json:"cum"`
@@ -158,6 +160,10 @@ func (f *JSONFormatter) convertToJSONFormat(analysis *profile.Analysis) *JSONOut
 
 	// Convert hotspots
 	output.Top = make([]JSONHotspot, len(analysis.Hotspots))
+	unit := ""
+	if analysis.Config.ValueType != nil {
+		unit = analysis.Config.ValueType.Unit
+	}
 	for i, hotspot := range analysis.Hotspots {
 		output.Top[i] = JSONHotspot{
 			Function:    hotspot.Function,
@@ -165,10 +171,11 @@ func (f *JSONFormatter) convertToJSONFormat(analysis *profile.Analysis) *JSONOut
 			LocationID:  hotspot.LocationID,
 			Address:     hotspot.Address,
 			Module:      hotspot.Module,
+			Unit:        unit,
 			Flat:        hotspot.FlatValue,
-			FlatPercent: hotspot.FlatPercent,
+			FlatPercent: roundPercent(hotspot.FlatPercent),
 			Cum:         hotspot.CumValue,
-			CumPercent:  hotspot.CumPercent,
+			CumPercent:  roundPercent(hotspot.CumPercent),
 		}
 	}
 
@@ -235,6 +242,10 @@ func (f *MarkdownFormatter) FormatAnalysis(analysis *profile.Analysis) error {
 
 // Helper functions
 
+func roundPercent(v float64) float64 {
+	return math.Round(v*100) / 100
+}
+
 func formatLocationID(id uint64) string {
 	return fmt.Sprintf("#%d", id)
 }
@@ -273,6 +284,23 @@ func generateSummary(analysis *profile.Analysis) string {
 	// Add sample count
 	parts = append(parts, fmt.Sprintf("Total samples: %d", analysis.SampleCount))
 
+	// Determine wording based on profile type
+	profileType := analysis.Metadata.Type
+	hotspotLabel := "Top hotspot"
+	concentratedLabel := "Highly concentrated performance bottleneck"
+	switch profileType {
+	case "heap", "space":
+		hotspotLabel = "Top memory hotspot"
+		concentratedLabel = "Highly concentrated memory allocation"
+	case "goroutine":
+		hotspotLabel = "Top blocking point"
+		concentratedLabel = "Highly concentrated goroutine blocking"
+	default:
+		if profileType != "cpu" {
+			concentratedLabel = "Highly concentrated workload"
+		}
+	}
+
 	// Add top function info with more context
 	if len(analysis.Hotspots) > 0 {
 		top := analysis.Hotspots[0]
@@ -283,11 +311,11 @@ func generateSummary(analysis *profile.Analysis) string {
 			topRef = *top.Address
 		}
 
-		parts = append(parts, fmt.Sprintf("Top hotspot: %s (%.2f%%)", topRef, top.FlatPercent))
+		parts = append(parts, fmt.Sprintf("%s: %s (%.2f%%)", hotspotLabel, topRef, top.FlatPercent))
 
 		// Add concentration info if top function dominates
 		if top.FlatPercent > 30 {
-			parts = append(parts, "Highly concentrated performance bottleneck")
+			parts = append(parts, concentratedLabel)
 		}
 	}
 
@@ -537,6 +565,9 @@ func (f *InfoTextFormatter) FormatInfoResult(result *profile.InfoResult) error {
 		fmt.Fprintf(f.writer, "Period:   %d (%s)\n", result.Period, result.PeriodType)
 	}
 	fmt.Fprintf(f.writer, "Samples:  %d\n", result.SampleCount)
+	if result.TotalValue > 0 {
+		fmt.Fprintf(f.writer, "Total Goroutines: %d\n", result.TotalValue)
+	}
 	fmt.Fprintf(f.writer, "Functions: %d\n", result.Functions)
 	fmt.Fprintf(f.writer, "Locations: %d\n", result.Locations)
 
@@ -635,6 +666,10 @@ func (f *InfoJSONFormatter) FormatInfoResult(result *profile.InfoResult) error {
 		output["mappings"] = result.Mappings
 	}
 
+	if result.TotalValue > 0 {
+		output["total_value"] = result.TotalValue
+	}
+
 	if len(result.Comments) > 0 {
 		output["comments"] = result.Comments
 	}
@@ -666,6 +701,9 @@ func (f *InfoMarkdownFormatter) FormatInfoResult(result *profile.InfoResult) err
 		fmt.Fprintf(f.writer, "| Period | %d (%s) |\n", result.Period, result.PeriodType)
 	}
 	fmt.Fprintf(f.writer, "| Samples | %d |\n", result.SampleCount)
+	if result.TotalValue > 0 {
+		fmt.Fprintf(f.writer, "| Total Goroutines | %d |\n", result.TotalValue)
+	}
 	fmt.Fprintf(f.writer, "| Functions | %d |\n", result.Functions)
 	fmt.Fprintf(f.writer, "| Locations | %d |\n", result.Locations)
 	fmt.Fprintf(f.writer, "| Symbols | %v |\n", result.HasSymbols)
@@ -1108,8 +1146,10 @@ func (f *DiffTextFormatter) formatFunctionDelta(rank int, delta profile.Function
 
 	fmt.Fprintf(f.writer, "   Flat:    %s%d (%s%.2f%% → %d)\n",
 		prefix, delta.FlatDelta, prefix, delta.FlatDeltaPercent, delta.TargetFlat)
-	fmt.Fprintf(f.writer, "   Cum:     %s%d (%s%.2f%% → %d)\n",
-		prefix, delta.CumDelta, prefix, delta.CumDeltaPercent, delta.TargetCum)
+	if delta.CumDelta != 0 || delta.CumDeltaPercent != 0 {
+		fmt.Fprintf(f.writer, "   Cum:     %s%d (%s%.2f%% → %d)\n",
+			prefix, delta.CumDelta, prefix, delta.CumDeltaPercent, delta.TargetCum)
+	}
 }
 
 // DiffJSONFormatter formats diff results in JSON format
@@ -1122,21 +1162,60 @@ func NewDiffJSONFormatter(w io.Writer) *DiffJSONFormatter {
 	return &DiffJSONFormatter{writer: w}
 }
 
+// convertDeltaToMap converts a FunctionDelta to a snake_case map for JSON output.
+func convertDeltaToMap(delta profile.FunctionDelta) map[string]interface{} {
+	return map[string]interface{}{
+		"function":          delta.Function,
+		"file":              delta.File,
+		"location_id":       delta.LocationID,
+		"address":           delta.Address,
+		"module":            delta.Module,
+		"base_flat":         delta.BaseFlat,
+		"target_flat":       delta.TargetFlat,
+		"base_cum":          delta.BaseCum,
+		"target_cum":        delta.TargetCum,
+		"flat_delta":        delta.FlatDelta,
+		"flat_delta_percent": roundPercent(delta.FlatDeltaPercent),
+		"cum_delta":         delta.CumDelta,
+		"cum_delta_percent":  roundPercent(delta.CumDeltaPercent),
+		"is_new":            delta.IsNew,
+		"is_deleted":        delta.IsDeleted,
+	}
+}
+
 // FormatDiffResult formats and outputs the diff result as JSON
 func (f *DiffJSONFormatter) FormatDiffResult(result *profile.DiffResult, base, target string) error {
+	// Convert function delta slices to snake_case maps
+	regressions := make([]map[string]interface{}, len(result.Regressions))
+	for i, d := range result.Regressions {
+		regressions[i] = convertDeltaToMap(d)
+	}
+	improvements := make([]map[string]interface{}, len(result.Improvements))
+	for i, d := range result.Improvements {
+		improvements[i] = convertDeltaToMap(d)
+	}
+	newFns := make([]map[string]interface{}, len(result.NewFunctions))
+	for i, d := range result.NewFunctions {
+		newFns[i] = convertDeltaToMap(d)
+	}
+	deletedFns := make([]map[string]interface{}, len(result.DeletedFunctions))
+	for i, d := range result.DeletedFunctions {
+		deletedFns[i] = convertDeltaToMap(d)
+	}
+
 	output := map[string]interface{}{
 		"base":         base,
 		"target":       target,
 		"value_type":   result.ValueType,
-		"regressions":  result.Regressions,
-		"improvements": result.Improvements,
-		"new":          result.NewFunctions,
-		"deleted":      result.DeletedFunctions,
+		"regressions":  regressions,
+		"improvements": improvements,
+		"new":          newFns,
+		"deleted":      deletedFns,
 		"overall": map[string]interface{}{
 			"base_total":     result.OverallDiff.BaseTotal,
 			"target_total":   result.OverallDiff.TargetTotal,
 			"total_delta":    result.OverallDiff.TotalDelta,
-			"total_percent":  result.OverallDiff.TotalPercent,
+			"total_percent":  roundPercent(result.OverallDiff.TotalPercent),
 			"base_samples":   result.OverallDiff.BaseSamples,
 			"target_samples": result.OverallDiff.TargetSamples,
 		},

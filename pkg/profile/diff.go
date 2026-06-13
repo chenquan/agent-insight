@@ -82,6 +82,10 @@ func Diff(base, target *profile.Profile, config DiffConfig) (*DiffResult, error)
 		return nil, fmt.Errorf("both profiles must be non-nil")
 	}
 
+	if err := ValidateTypeConsistency([]*profile.Profile{base, target}); err != nil {
+		return nil, err
+	}
+
 	// Set default value type if not specified
 	if config.ValueType == nil {
 		metadata := extractMetadata(base)
