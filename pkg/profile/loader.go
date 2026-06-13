@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/google/pprof/profile"
@@ -54,4 +56,36 @@ func (l *Loader) ParseFromReader(r io.Reader, filename string) (*profile.Profile
 	}
 
 	return p, nil
+}
+
+// DiscoverProfiles recursively finds .pb and .pb.gz files in a directory.
+func (l *Loader) DiscoverProfiles(dir string) ([]string, error) {
+	var paths []string
+
+	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+
+		base := strings.ToLower(d.Name())
+		if strings.HasSuffix(base, ".pb.gz") || strings.HasSuffix(base, ".pb") {
+			paths = append(paths, path)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to scan directory %s: %w", dir, err)
+	}
+
+	if len(paths) == 0 {
+		return nil, fmt.Errorf("no profile files (.pb or .pb.gz) found in %s", dir)
+	}
+
+	sort.Strings(paths)
+	return paths, nil
 }

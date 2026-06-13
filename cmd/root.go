@@ -24,6 +24,7 @@ Core commands:
   flame    - Generate folded stack format for flame graphs
   diff     - Compare two profiles to identify performance changes
   merge    - Merge multiple profiles of the same type
+  trend    - Analyze performance trends across multiple profiles
   info     - Show profile metadata overview
   traces   - Show individual sample call traces
   tree     - Show hierarchical call tree`,
@@ -49,6 +50,7 @@ func init() {
 	rootCmd.AddCommand(commands.TracesCmd)
 	rootCmd.AddCommand(commands.TreeCmd)
 	rootCmd.AddCommand(commands.MergeCmd)
+	rootCmd.AddCommand(commands.TrendCmd)
 	rootCmd.AddCommand(commands.InitCmd)
 
 	// Here you will define your flags and configuration settings.

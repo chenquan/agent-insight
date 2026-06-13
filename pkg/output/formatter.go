@@ -1297,3 +1297,287 @@ func (f *DiffMarkdownFormatter) FormatDiffResult(result *profile.DiffResult, bas
 
 	return nil
 }
+
+// TrendFormatter interface for trend command output
+type TrendFormatter interface {
+	FormatTrendResult(result *profile.TrendResult) error
+}
+
+// TrendTextFormatter outputs trend result in human-readable text format
+type TrendTextFormatter struct {
+	writer io.Writer
+}
+
+// NewTrendTextFormatter creates a new trend text formatter
+func NewTrendTextFormatter(w io.Writer) *TrendTextFormatter {
+	return &TrendTextFormatter{writer: w}
+}
+
+// FormatTrendResult formats and outputs the trend result as text
+func (f *TrendTextFormatter) FormatTrendResult(result *profile.TrendResult) error {
+	w := f.writer
+
+	fmt.Fprintf(w, "Performance Trend Analysis\n")
+	fmt.Fprintf(w, "==========================\n\n")
+
+	fmt.Fprintf(w, "Profiles: %d | Value Type: %s\n", len(result.TimePoints), result.ValueType)
+	if len(result.TimePoints) > 0 {
+		fmt.Fprintf(w, "Time Range: %s → %s\n", result.TimePoints[0].Label, result.TimePoints[len(result.TimePoints)-1].Label)
+	}
+	fmt.Fprintf(w, "Overall Slope: %.2f\n", result.Overall.Slope)
+	fmt.Fprintf(w, "Functions: %d regressing, %d improving, %d stable\n\n",
+		result.RegressingCount, result.ImprovingCount, result.StableCount)
+
+	if len(result.TopRegressions) > 0 {
+		fmt.Fprintf(w, "Top Regressions (slope descending)\n")
+		fmt.Fprintf(w, "%s\n", strings.Repeat("-", 50))
+		for i, ft := range result.TopRegressions {
+			fmt.Fprintf(w, "\n%d. %s [slope: %.2f, %s]\n", i+1, funcName(ft), ft.Slope, ft.Trend)
+			fmt.Fprintf(w, "   flat series: %s\n", formatSeries(ft.FlatSeries))
+			fmt.Fprintf(w, "   start: %s → end: %s (%s)\n",
+				formatIntPtr(ft.StartValue), formatIntPtr(ft.EndValue), changePercent(ft.StartValue, ft.EndValue))
+		}
+		fmt.Fprintf(w, "\n")
+	}
+
+	if len(result.TopImprovements) > 0 {
+		fmt.Fprintf(w, "Top Improvements (slope ascending)\n")
+		fmt.Fprintf(w, "%s\n", strings.Repeat("-", 50))
+		for i, ft := range result.TopImprovements {
+			fmt.Fprintf(w, "\n%d. %s [slope: %.2f, %s]\n", i+1, funcName(ft), ft.Slope, ft.Trend)
+			fmt.Fprintf(w, "   flat series: %s\n", formatSeries(ft.FlatSeries))
+			fmt.Fprintf(w, "   start: %s → end: %s (%s)\n",
+				formatIntPtr(ft.StartValue), formatIntPtr(ft.EndValue), changePercent(ft.StartValue, ft.EndValue))
+		}
+		fmt.Fprintf(w, "\n")
+	}
+
+	if len(result.NewHotspots) > 0 {
+		fmt.Fprintf(w, "New Hotspots\n")
+		fmt.Fprintf(w, "%s\n", strings.Repeat("-", 50))
+		for i, ft := range result.NewHotspots {
+			fmt.Fprintf(w, "\n%d. %s\n", i+1, funcName(ft))
+			fmt.Fprintf(w, "   flat series: %s\n", formatSeries(ft.FlatSeries))
+		}
+		fmt.Fprintf(w, "\n")
+	}
+
+	if len(result.VolatileFunctions) > 0 {
+		fmt.Fprintf(w, "Volatile Functions (CV > 0.3)\n")
+		fmt.Fprintf(w, "%s\n", strings.Repeat("-", 50))
+		for i, ft := range result.VolatileFunctions {
+			fmt.Fprintf(w, "\n%d. %s [CV: %.3f]\n", i+1, funcName(ft), ft.Volatility)
+			fmt.Fprintf(w, "   flat series: %s\n", formatSeries(ft.FlatSeries))
+		}
+		fmt.Fprintf(w, "\n")
+	}
+
+	return nil
+}
+
+// TrendJSONFormatter outputs trend result as JSON
+type TrendJSONFormatter struct {
+	writer io.Writer
+}
+
+// NewTrendJSONFormatter creates a new trend JSON formatter
+func NewTrendJSONFormatter(w io.Writer) *TrendJSONFormatter {
+	return &TrendJSONFormatter{writer: w}
+}
+
+// FormatTrendResult formats and outputs the trend result as JSON
+func (f *TrendJSONFormatter) FormatTrendResult(result *profile.TrendResult) error {
+	output := map[string]interface{}{
+		"value_type":  result.ValueType,
+		"time_points": convertTimePoints(result.TimePoints),
+		"overall": map[string]interface{}{
+			"total_series": result.Overall.TotalSeries,
+			"slope":        result.Overall.Slope,
+		},
+		"summary": map[string]interface{}{
+			"regressing_count": result.RegressingCount,
+			"improving_count":  result.ImprovingCount,
+			"stable_count":     result.StableCount,
+		},
+		"top_regressions":  convertFunctionTrends(result.TopRegressions),
+		"top_improvements": convertFunctionTrends(result.TopImprovements),
+	}
+
+	if len(result.NewHotspots) > 0 {
+		output["new_hotspots"] = convertFunctionTrends(result.NewHotspots)
+	}
+	if len(result.VolatileFunctions) > 0 {
+		output["volatile"] = convertFunctionTrends(result.VolatileFunctions)
+	}
+
+	enc := json.NewEncoder(f.writer)
+	enc.SetIndent("", "  ")
+	return enc.Encode(output)
+}
+
+// TrendMarkdownFormatter outputs trend result as Markdown
+type TrendMarkdownFormatter struct {
+	writer io.Writer
+}
+
+// NewTrendMarkdownFormatter creates a new trend markdown formatter
+func NewTrendMarkdownFormatter(w io.Writer) *TrendMarkdownFormatter {
+	return &TrendMarkdownFormatter{writer: w}
+}
+
+// FormatTrendMarkdownResult formats and outputs the trend result as Markdown
+func (f *TrendMarkdownFormatter) FormatTrendMarkdownResult(result *profile.TrendResult) error {
+	w := f.writer
+
+	fmt.Fprintf(w, "# Performance Trend Analysis\n\n")
+	fmt.Fprintf(w, "- **Profiles:** %d\n", len(result.TimePoints))
+	fmt.Fprintf(w, "- **Value Type:** %s\n", result.ValueType)
+	if len(result.TimePoints) > 0 {
+		fmt.Fprintf(w, "- **Time Range:** `%s` → `%s`\n", result.TimePoints[0].Label, result.TimePoints[len(result.TimePoints)-1].Label)
+	}
+	fmt.Fprintf(w, "- **Overall Slope:** %.2f\n", result.Overall.Slope)
+	fmt.Fprintf(w, "- **Functions:** %d regressing, %d improving, %d stable\n\n",
+		result.RegressingCount, result.ImprovingCount, result.StableCount)
+
+	if len(result.TopRegressions) > 0 {
+		fmt.Fprintf(w, "## Top Regressions\n\n")
+		fmt.Fprintf(w, "| Rank | Function | Slope | Trend | Flat Series | Change |\n")
+		fmt.Fprintf(w, "|------|----------|-------|-------|-------------|--------|\n")
+		for i, ft := range result.TopRegressions {
+			fmt.Fprintf(w, "| %d | `%s` | %.2f | %s | %s | %s |\n",
+				i+1, funcName(ft), ft.Slope, ft.Trend,
+				formatSeries(ft.FlatSeries), changePercent(ft.StartValue, ft.EndValue))
+		}
+		fmt.Fprintf(w, "\n")
+	}
+
+	if len(result.TopImprovements) > 0 {
+		fmt.Fprintf(w, "## Top Improvements\n\n")
+		fmt.Fprintf(w, "| Rank | Function | Slope | Trend | Flat Series | Change |\n")
+		fmt.Fprintf(w, "|------|----------|-------|-------|-------------|--------|\n")
+		for i, ft := range result.TopImprovements {
+			fmt.Fprintf(w, "| %d | `%s` | %.2f | %s | %s | %s |\n",
+				i+1, funcName(ft), ft.Slope, ft.Trend,
+				formatSeries(ft.FlatSeries), changePercent(ft.StartValue, ft.EndValue))
+		}
+		fmt.Fprintf(w, "\n")
+	}
+
+	if len(result.NewHotspots) > 0 {
+		fmt.Fprintf(w, "## New Hotspots\n\n")
+		fmt.Fprintf(w, "| Rank | Function | Flat Series |\n")
+		fmt.Fprintf(w, "|------|----------|-------------|\n")
+		for i, ft := range result.NewHotspots {
+			fmt.Fprintf(w, "| %d | `%s` | %s |\n", i+1, funcName(ft), formatSeries(ft.FlatSeries))
+		}
+		fmt.Fprintf(w, "\n")
+	}
+
+	if len(result.VolatileFunctions) > 0 {
+		fmt.Fprintf(w, "## Volatile Functions\n\n")
+		fmt.Fprintf(w, "| Rank | Function | CV | Flat Series |\n")
+		fmt.Fprintf(w, "|------|----------|----|-------------|\n")
+		for i, ft := range result.VolatileFunctions {
+			fmt.Fprintf(w, "| %d | `%s` | %.3f | %s |\n", i+1, funcName(ft), ft.Volatility, formatSeries(ft.FlatSeries))
+		}
+		fmt.Fprintf(w, "\n")
+	}
+
+	return nil
+}
+
+func funcName(ft profile.FunctionTrend) string {
+	if ft.Function != nil {
+		return *ft.Function
+	}
+	if ft.Address != nil {
+		return *ft.Address
+	}
+	return fmt.Sprintf("Location %s", formatLocationID(*ft.LocationID))
+}
+
+func formatSeries(series []*int64) string {
+	parts := make([]string, len(series))
+	for i, v := range series {
+		if v == nil {
+			parts[i] = "-"
+		} else {
+			parts[i] = fmt.Sprintf("%d", *v)
+		}
+	}
+	return "[" + strings.Join(parts, ", ") + "]"
+}
+
+func formatIntPtr(v *int64) string {
+	if v == nil {
+		return "-"
+	}
+	return fmt.Sprintf("%d", *v)
+}
+
+func changePercent(start, end *int64) string {
+	if start == nil || end == nil || *start == 0 {
+		return "-"
+	}
+	pct := float64(*end-*start) / float64(*start) * 100
+	if pct >= 0 {
+		return fmt.Sprintf("+%.1f%%", pct)
+	}
+	return fmt.Sprintf("%.1f%%", pct)
+}
+
+func convertTimePoints(tps []profile.TimePoint) []map[string]interface{} {
+	result := make([]map[string]interface{}, len(tps))
+	for i, tp := range tps {
+		result[i] = map[string]interface{}{
+			"label": tp.Label,
+			"time":  tp.Time,
+		}
+	}
+	return result
+}
+
+func convertFunctionTrends(fts []profile.FunctionTrend) []map[string]interface{} {
+	result := make([]map[string]interface{}, len(fts))
+	for i, ft := range fts {
+		entry := map[string]interface{}{
+			"slope":      ft.Slope,
+			"trend":      ft.Trend,
+			"avg_flat":   ft.AvgFlat,
+			"volatility": ft.Volatility,
+		}
+		if ft.Function != nil {
+			entry["function"] = *ft.Function
+		}
+		if ft.File != nil {
+			entry["file"] = *ft.File
+		}
+		if ft.Address != nil {
+			entry["address"] = *ft.Address
+		}
+		if ft.Module != nil {
+			entry["module"] = *ft.Module
+		}
+
+		flatSeries := make([]interface{}, len(ft.FlatSeries))
+		for j, v := range ft.FlatSeries {
+			flatSeries[j] = v
+		}
+		cumSeries := make([]interface{}, len(ft.CumSeries))
+		for j, v := range ft.CumSeries {
+			cumSeries[j] = v
+		}
+		entry["flat_series"] = flatSeries
+		entry["cum_series"] = cumSeries
+
+		if ft.StartValue != nil {
+			entry["start_value"] = *ft.StartValue
+		}
+		if ft.EndValue != nil {
+			entry["end_value"] = *ft.EndValue
+		}
+
+		result[i] = entry
+	}
+	return result
+}

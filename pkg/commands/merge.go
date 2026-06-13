@@ -4,9 +4,6 @@ import (
 	"compress/gzip"
 	"fmt"
 	"os"
-	"path/filepath"
-	"sort"
-	"strings"
 
 	pprofprofile "github.com/google/pprof/profile"
 
@@ -57,7 +54,7 @@ func runMerge(cmd *cobra.Command, args []string) error {
 		}
 
 		if info.IsDir() {
-			paths, err := discoverProfiles(arg)
+			paths, err := profile.NewLoader().DiscoverProfiles(arg)
 			if err != nil {
 				return err
 			}
@@ -99,38 +96,6 @@ func runMerge(cmd *cobra.Command, args []string) error {
 		result.InputCount, result.TotalSamples, result.ValueType, outputPath)
 
 	return nil
-}
-
-// discoverProfiles recursively finds .pb and .pb.gz files in a directory.
-func discoverProfiles(dir string) ([]string, error) {
-	var paths []string
-
-	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			return nil
-		}
-
-		base := strings.ToLower(d.Name())
-		if strings.HasSuffix(base, ".pb.gz") || strings.HasSuffix(base, ".pb") {
-			paths = append(paths, path)
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to scan directory %s: %w", dir, err)
-	}
-
-	if len(paths) == 0 {
-		return nil, fmt.Errorf("no profile files (.pb or .pb.gz) found in %s", dir)
-	}
-
-	sort.Strings(paths)
-	return paths, nil
 }
 
 // writeMergeOutput writes the merged profile as gzip-compressed protobuf.

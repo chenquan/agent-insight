@@ -8,7 +8,7 @@ A lightweight pprof analysis CLI for AI coding assistants. Works with any pprof-
 - **AI-Friendly Output**: Structured JSON format optimized for LLM parsing
 - **Symbol Fallback**: Gracefully handles production profiles without debug symbols
 - **Multi-Value Support**: Smart defaults for complex profile types (Go, C++, etc.)
-- **Eight Core Commands**: analyze, list, flame, diff, info, traces, tree, init
+- **Nine Core Commands**: analyze, list, flame, diff, merge, trend, info, traces, tree, init
 
 ## Installation
 
@@ -79,6 +79,17 @@ agent-insight diff before.prof after.prof
 agent-insight diff base.prof target.prof --min-delta 10 --format json
 agent-insight diff base.prof target.prof --hide-new --hide-deleted
 ```
+
+### trend - Analyze performance trends
+
+```bash
+agent-insight trend ./profiles/cpu/
+agent-insight trend p1.pb.gz p2.pb.gz p3.pb.gz --format json
+agent-insight trend ./cpu/ --focus "pkg/server.*" --include-new
+agent-insight trend ./cpu/ --min-impact 0.5 --threshold 3 --top 5
+```
+
+Requires at least 3 profiles. Detects regressing/improving functions via linear regression, with optional new hotspot and volatile function detection.
 
 ### init - Generate Claude Code skill
 
