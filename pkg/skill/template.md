@@ -200,6 +200,7 @@ agent-insight merge ./profiles/ -o merged.pb.gz
 ## 典型工作流
 
 ### 快速概览
+
 ```
 用户说"看看这个 profile" / "这是什么文件"
   │
@@ -209,7 +210,19 @@ agent-insight merge ./profiles/ -o merged.pb.gz
   2. （根据 info 结果决定下一步：analyze? tree? traces?）
 ```
 
+**决策点**:
+- `type=cpu` 且 `samples` 较多 → 工作流 2（CPU 性能分析）
+- `type=heap` 且有 `alloc_space` 等多个值类型 → 工作流 3（内存分析）
+- `type=goroutine` 且 `samples` 巨大 → 怀疑 goroutine 泄漏,用 `traces --focus` 看 top stack
+- `value_types` 只有 1 个 → 该 profile 是单值,不需要 `--value-type` 切换
+
+**陷阱提示**:
+- 别只跑 info 就给结论,info 只看元数据,看不到热点分布
+- `samples < 100` 时分析结果不稳定,需要更长采集周期
+- `has_symbols=false` 是生产环境常见情况,工具会自动 fallback 到 address,不是错误
+
 ### CPU 性能分析
+
 ```
 用户说"服务很慢" / "CPU 占用高"
   │
@@ -223,7 +236,28 @@ agent-insight merge ./profiles/ -o merged.pb.gz
       → 生成火焰图数据，查看完整调用路径
 ```
 
+**决策点 (步骤 1)**:
+- top 都是 leaf 函数 (`runtime.*` / `syscall.*`) → 该函数是 self-bottleneck,直接跳步骤 3 用 `flame` 看完整栈
+- top 是 internal 函数 (业务代码) → 该函数是 caller,不是 self-bottleneck。用 `list <func> --callers-only` 找真正的触发者
+- top flat_percent 都很分散 (< 10% 各自) → 没有明显热点,考虑 `--top` 加到 30-50 看更广
+
+**决策点 (步骤 2)**:
+- 看到该函数被 N 个不同 caller 调用 → 调用面广,优化此函数收益大
+- 看到该函数只被 1-2 个 caller 调用 → 调用面窄,优先看 caller 而不是这个函数
+- 看到 callee 是 `runtime.*` → 该函数在频繁触发 runtime,不是 runtime 本身慢
+
+**决策点 (步骤 3)**:
+- `flame` 输出中某栈深度突然变宽 → 找到"汇聚点",展开它
+- `flame` 输出全是 1-2 层浅栈 → profile 采集在 native 代码或采样周期过粗
+
+**陷阱提示**:
+- 别只看 flat 排序,internal 函数的 cum 高但 flat 低,通常是 caller,不是真正的热点
+- `runtime.*` 占比高不等于 `runtime` 是问题,它可能只是被某段代码高频触发
+- `flame` 输出按 `;` 分隔的栈,深度用 `wc -l` 看采样数,不要逐行计数
+- `--cum` 是诊断入口;真正优化要找 flat 高的 leaf
+
 ### 内存分析
+
 ```
 用户说"内存泄漏" / "OOM"
   │
@@ -237,24 +271,96 @@ agent-insight merge ./profiles/ -o merged.pb.gz
       → 追踪谁在分配这些对象
 ```
 
+**决策点 (步骤 1)**:
+- `alloc_objects` top 是高频小对象 (bytes.Buffer / string concat) → 是分配速率问题,不是泄漏
+- `alloc_objects` top 是 `main.*` 大块分配 → 是分配源问题,看调用者
+- `alloc_objects` top 是 `runtime.slice` 之类 → 是 GC 压力,看 slice/map 增长
+
+**决策点 (步骤 2)**:
+- `inuse_space` 跟 `alloc_space` 排序差异大 → 当前在用的大对象 ≠ 分配最多的大对象,看分配源
+- `inuse_space` top 是 `main.makeSlice` 之类 → 累积型大对象,看是否被全局引用
+- `inuse_space` 跟 `alloc_space` 几乎一样 → 当前持有的就是分配出来的,看为什么没释放
+
+**决策点 (步骤 3)**:
+- `--callers-only` 看到是 `main.handler` → HTTP/GRPC 路径上的分配,看 QPS × 单次分配量
+- `--callers-only` 看到是 `init` 函数 → 启动期分配,通常不是泄漏点
+- `--callers-only` 看到 N 个 caller 都调 → 公共路径,优化收益大
+
+**陷阱提示**:
+- `inuse_objects` 几乎没用,大对象决定内存,不是对象个数
+- 看到 `runtime.mallocgc` 占比高 ≠ 内存问题,它是所有分配的"出口"
+- Heap profile 4 个值类型语义不同:`alloc_*` 是分配速率,`inuse_*` 是当前持有;不能混用
+- 内存"泄漏"在 Go 里通常是全局引用未释放,不是 C 风格的 malloc 忘 free
+
 ### 调用路径追踪
+
 ```
 用户说"哪些路径调到了 mallocgc" / "看看调用链"
   │
-  1. agent-insight traces profile.pb.gz "runtime.mallocgc" --format json
+  1. agent-insight traces profile.pb.gz --focus "runtime.mallocgc" --format json
       → 展示所有经过 mallocgc 的原始调用链
   │
   2. agent-insight tree profile.pb.gz --focus "runtime.mallocgc"
       → 在调用树中定位该函数的层级位置
 ```
 
+**决策点 (步骤 1)**:
+- `traces` 输出的 `stack` 数组长度差异大 → 不同入口走不同路径,逐一展开
+- `traces` 输出的 `percent` 集中在几条 → 优化这几条就能覆盖大部分开销
+- `traces` 输出空 → `--focus` 正则太严,放宽或改用 `analyze --focus`
+
+**决策点 (步骤 2)**:
+- `tree` 中该函数在第 1-2 层 → 它靠近入口,优化它影响整个程序
+- `tree` 中该函数在第 5+ 层 → 它在深路径,先看它的直接 caller
+- `tree` 中该函数有多个 parent → 它是多入口共享的,优化收益大
+
+**陷阱提示**:
+- `traces` 跟 `flame` 是互补的:`traces` 看每条原始链,`flame` 看聚合;不要混
+- `tree` 按 `--cum` 排序时,根节点 cum 总和等于 profile 总量,这是校验 baseline
+- `stack` 数组是 `根 → 叶` 顺序(Sample.Location[0] 是 leaf),不是 `叶 → 根`
+
 ### 版本对比
+
 ```
 用户说"升级后变慢了" / "想对比性能"
   │
   1. agent-insight diff base.pb.gz target.pb.gz --format json
       → 找到回归和改进的函数
 ```
+
+**决策点**:
+- `regressions[]` 非空且 `flat_delta_percent > 20` → 明显回归,优先优化
+- `regressions[]` 非空但 `flat_delta_percent < 10` → 噪音,叠加更多样本再判
+- `improvements[]` 非空 → 优化已生效,继续验证
+- `new[]` 非空 → 这次新增的热点,先确认是不是计划内的新代码
+- `deleted[]` 非空 → 这次消失的热点,可能是重构掉了或 dead code
+- `overall.total_percent > 0` → 整体性能下降,系统级问题
+- `overall.total_percent < 0` → 整体性能提升,系统级优化有效
+
+**陷阱提示**:
+- `new_functions[]` 非空不一定是 regression,可能只是新代码还没被旧 profile 采到
+- `delta_percent` 极小但绝对值大时,小函数的高频调用也可能造成真实问题
+- 一定要确认 base 和 target 是同类型 profile (cpu vs cpu),否则 diff 无意义
+- 加 `--min-delta 5` 过滤掉 5% 以内的变化,关注显著回归
+
+## 决策树: 看到 X → 跑 Y
+
+| 你看到 | 下一步 |
+|--------|--------|
+| `info` 显示 `type=cpu` + 大量 samples | `analyze --cum` 找 top 热点 |
+| `info` 显示 `type=heap` + 内存增长 | `analyze --value-type alloc_space` 看分配源 |
+| `info` 显示 `type=heap` + 当前占用高 | `analyze --value-type inuse_space` 看大对象 |
+| `info` 显示 `type=heap` + 大量小对象 | `analyze --value-type alloc_objects` 看分配速率 |
+| `info` 显示 `type=goroutine` + count > 10000 | 怀疑泄漏,`traces --focus` 看 top stack |
+| `analyze` top 是 leaf 函数 (`runtime.*`) | `flame` 看完整栈,确认是否 self-bottleneck |
+| `analyze` top 是 internal 函数 (业务代码) | `list <func> --callers-only` 找真正的触发者 |
+| `analyze` top 都很分散 (< 10% 各自) | `--top 50` 加宽,或换 `--cum` 排序 |
+| `list` 输出 callee 是 `runtime.*` | runtime 是被高频触发,不是问题源,看 caller |
+| `diff` 看到 `new_functions[]` 非空 | `list <new-func>` 验证是不是真"新",还是 base 漏采 |
+| `diff` 看到 `regressions[]` 且 `delta_percent > 20` | 重点优化,定位到该函数 |
+| 命令报 `no samples matched` | 放宽 `--focus` 正则,或去掉 `--focus` |
+| 命令报 `unknown value-type` | `info` 看 `value_types` 列表,用其中之一 |
+| 命令报 `failed to load profile` | `info <file>` 验证文件能解析,确认格式 |
 
 ## 输出解读
 
@@ -298,9 +404,61 @@ agent-insight merge ./profiles/ -o merged.pb.gz
 | `cum` | 累计耗时/内存（含子调用） |
 | `flat_percent` | flat 占总量百分比 |
 | `cum_percent` | cum 占总量百分比 |
-| `function_name` | 函数名 |
+| `function` | 函数名 |
 | `file` | 源文件路径 |
 | `line` | 行号 |
+
+### analyze 模式识别 (flat vs cum)
+
+理解 flat 和 cum 的关系是分析的核心。4 种典型模式:
+
+**1. `flat` 高 + `cum` 高 → self-bottleneck**
+- 函数本身慢,需要优化函数实现
+- 是优化首选目标
+
+```json
+{
+  "function": "runtime.mallocgc",
+  "file": "runtime/malloc.go:1020",
+  "flat": 600,
+  "flat_percent": 54.55,
+  "cum": 600,
+  "cum_percent": 54.55
+}
+```
+↑ `flat == cum`,纯 leaf,这是 `runtime.mallocgc` 的 self-bottleneck。
+
+**2. `flat` 低 + `cum` 高 → caller bottleneck**
+- 函数被很多 caller 触发,优化此函数影响有限
+- 要看 caller,优化触发它的入口
+
+(本仓库 testdata 未覆盖此模式,实际中表现为如 `flat=50, cum=800` 的中间层函数。)
+
+**3. `flat` 高 + `cum` = `flat` → leaf**
+- 叶子函数,没被谁调,自己耗时
+- 与 self-bottleneck 等价,优先优化
+
+(`runtime.mallocgc` 示例即符合此模式。)
+
+**4. `flat` = 0 + `cum` 高 → pure caller**
+- 纯调用方,自己没耗时,但所有耗时都从它过
+- 看它的 callee 找真正热点
+
+```json
+{
+  "function": "main.handleRequest",
+  "file": "main.go:42",
+  "flat": 0,
+  "cum": 950,
+  "cum_percent": 86.36,
+  "callees": [
+    { "Function": "runtime.mallocgc", "FlatValue": 500 },
+    { "Function": "encoding/json.Marshal", "FlatValue": 300 },
+    { "Function": "io.ReadAll", "FlatValue": 150 }
+  ]
+}
+```
+↑ `flat=0, cum=950`,所有 950 个采样都从它的 callees 走,这是 `main.handleRequest` 的 pure caller 模式。
 
 ### diff JSON 输出字段
 
@@ -308,9 +466,79 @@ agent-insight merge ./profiles/ -o merged.pb.gz
 |------|------|
 | `delta_flat` | flat 值变化量 |
 | `delta_cum` | cum 值变化量 |
-| `delta_percent` | 变化百分比（正值=回归，负值=改进） |
-| `new_functions` | target 中新增的函数 |
-| `deleted_functions` | target 中消失的函数 |
+| `flat_delta_percent` | flat 变化百分比（正值=回归，负值=改进） |
+| `new` | target 中新增的函数 |
+| `deleted` | target 中消失的函数 |
+| `regressions` | 回归的函数列表 |
+| `improvements` | 改进的函数列表 |
+| `overall` | 整体变化（base/target 总量、total_percent） |
+
+### diff 模式识别
+
+`diff` 的核心是判断"变化方向"和"变化量",4 种典型解读:
+
+**1. `flat_delta_percent > 0` → regression**
+
+```json
+{
+  "function": "runtime.mallocgc",
+  "file": "runtime/malloc.go:1020",
+  "base_flat": 600,
+  "target_flat": 900,
+  "flat_delta": 300,
+  "flat_delta_percent": 50,
+  "is_new": false,
+  "is_deleted": false
+}
+```
+↑ `flat_delta_percent=50` 表示 target 比 base 慢 50%,这是 regression。
+
+**2. `flat_delta_percent < 0` → improvement**
+
+```json
+{
+  "function": "runtime.mallocgc",
+  "file": "runtime/malloc.go:1020",
+  "base_flat": 600,
+  "target_flat": 300,
+  "flat_delta": -300,
+  "flat_delta_percent": -50,
+  "is_new": false,
+  "is_deleted": false
+}
+```
+↑ `flat_delta_percent=-50` 表示 target 比 base 快 50%,这是 improvement。
+
+**3. `new[]` 非空 → new hotspots**
+
+```json
+{
+  "function": "main.newHotFunc",
+  "file": "main.go:99",
+  "base_flat": 0,
+  "target_flat": 200,
+  "flat_delta": 200,
+  "is_new": true,
+  "is_deleted": false
+}
+```
+↑ base 中没有,target 中出现 200 个采样,这是新出现的热点。
+
+**4. `deleted[]` 非空 → gone hotspots**
+
+```json
+{
+  "function": "encoding/json.Marshal",
+  "file": "encoding/json/encode.go:160",
+  "base_flat": 300,
+  "target_flat": 0,
+  "flat_delta": -300,
+  "flat_delta_percent": -100,
+  "is_new": false,
+  "is_deleted": true
+}
+```
+↑ base 中有 300 个采样,target 中消失,这是 gone hotspot (可能是重构或被替换)。
 
 ### list JSON 输出字段
 
@@ -327,3 +555,5 @@ agent-insight merge ./profiles/ -o merged.pb.gz
 - CPU profile 用 `--cum` 找到根因，`--cum=false`（默认）找到直接热点
 - Heap profile 有多个值类型，用 `--value-type` 指定：`alloc_objects`、`alloc_space`、`inuse_objects`、`inuse_space`
 - 生产环境可能缺少 debug symbols，工具会自动降级显示地址信息
+- 面对典型工作流时,先按"决策点"分支选择命令;看到未知错误先看"决策树"段
+- flat 高 + cum 高是 self-bottleneck (优化目标),flat=0 + cum 高是 pure caller (看 callee)
