@@ -1581,3 +1581,169 @@ func convertFunctionTrends(fts []profile.FunctionTrend) []map[string]interface{}
 	}
 	return result
 }
+
+// DiagnoseFormatter formats diagnose prompt results.
+type DiagnoseFormatter interface {
+	FormatDiagnose(dp *profile.DiagnosePrompt) error
+}
+
+// DiagnoseTextFormatter outputs diagnose prompt as plain text.
+type DiagnoseTextFormatter struct {
+	writer io.Writer
+}
+
+func NewDiagnoseTextFormatter(w io.Writer) *DiagnoseTextFormatter {
+	return &DiagnoseTextFormatter{writer: w}
+}
+
+func (f *DiagnoseTextFormatter) FormatDiagnose(dp *profile.DiagnosePrompt) error {
+	fmt.Fprint(f.writer, dp.Text())
+	return nil
+}
+
+// DiagnoseMarkdownFormatter outputs diagnose prompt as Markdown.
+type DiagnoseMarkdownFormatter struct {
+	writer io.Writer
+}
+
+func NewDiagnoseMarkdownFormatter(w io.Writer) *DiagnoseMarkdownFormatter {
+	return &DiagnoseMarkdownFormatter{writer: w}
+}
+
+func (f *DiagnoseMarkdownFormatter) FormatDiagnose(dp *profile.DiagnosePrompt) error {
+	fmt.Fprintf(f.writer, "# 性能诊断\n\n")
+
+	fmt.Fprintf(f.writer, "## Profile 概况\n\n")
+	fmt.Fprintf(f.writer, "| 属性 | 值 |\n|------|------|\n")
+	fmt.Fprintf(f.writer, "| 类型 | %s |\n", dp.ProfileType)
+	fmt.Fprintf(f.writer, "| 语言 | %s |\n", dp.Language)
+	if dp.Metadata.Duration > 0 {
+		fmt.Fprintf(f.writer, "| 采样时长 | %s |\n", dp.Metadata.Duration)
+	}
+	fmt.Fprintf(f.writer, "| 采样数 | %d |\n", dp.Analysis.SampleCount)
+	if len(dp.Metadata.SampleTypes) > 0 {
+		fmt.Fprintf(f.writer, "| 值类型 | %s |\n", strings.Join(dp.Metadata.SampleTypes, ", "))
+	}
+	fmt.Fprintf(f.writer, "| 函数数量 | %d |\n", dp.Metadata.Functions)
+	fmt.Fprintf(f.writer, "\n")
+
+	fmt.Fprintf(f.writer, "## 热点函数\n\n")
+	fmt.Fprintf(f.writer, "| # | 函数 | 文件 | Flat | Flat%% | Cum | Cum%% |\n")
+	fmt.Fprintf(f.writer, "|---|------|------|------|-------|-----|-------|\n")
+	for i, h := range dp.Analysis.Hotspots {
+		name := "unknown"
+		if h.Function != nil {
+			name = fmt.Sprintf("`%s`", *h.Function)
+		} else if h.Address != nil {
+			name = *h.Address
+		}
+		file := "-"
+		if h.File != nil {
+			file = fmt.Sprintf("`%s`", *h.File)
+		}
+		fmt.Fprintf(f.writer, "| %d | %s | %s | %d | %.2f%% | %d | %.2f%% |\n",
+			i+1, name, file, h.FlatValue, h.FlatPercent, h.CumValue, h.CumPercent)
+	}
+	fmt.Fprintf(f.writer, "\n")
+
+	fmt.Fprintf(f.writer, "## 调用树\n\n")
+	if dp.Tree != nil {
+		for _, child := range dp.Tree.VisibleChildren() {
+			f.formatDiagnoseNode(child, 0, 5)
+		}
+	}
+	fmt.Fprintf(f.writer, "\n")
+
+	fmt.Fprintf(f.writer, "## 关键调用路径\n\n")
+	if dp.Traces != nil {
+		for i, trace := range dp.Traces.Traces {
+			fmt.Fprintf(f.writer, "### 路径 %d — 占比 %.2f%%\n\n", i+1, trace.Percent)
+			for j, fn := range trace.Stack {
+				fmt.Fprintf(f.writer, "%s- `%s`\n", strings.Repeat("  ", j), fn)
+			}
+			fmt.Fprintf(f.writer, "\n")
+		}
+	}
+
+	fmt.Fprintf(f.writer, "## 诊断引导\n\n")
+	fmt.Fprintf(f.writer, "%s\n\n", dp.Guidance)
+
+	fmt.Fprintf(f.writer, "## 输出要求\n\n")
+	fmt.Fprintf(f.writer, "1. **根因分析** — 一句话概括核心问题\n")
+	fmt.Fprintf(f.writer, "2. **优化建议** — 按优先级排序（影响大、改动小优先），每条包含改动点和预期收益\n")
+	fmt.Fprintf(f.writer, "3. **异常模式** — 如果检测到异常模式（内存泄漏、锁竞争、无限循环等），说明判断依据\n\n")
+
+	if dp.UserContext != "" {
+		fmt.Fprintf(f.writer, "## 用户上下文\n\n")
+		fmt.Fprintf(f.writer, "%s\n", dp.UserContext)
+	}
+
+	return nil
+}
+
+func (f *DiagnoseMarkdownFormatter) formatDiagnoseNode(node *profile.CallTreeNode, depth, maxDepth int) {
+	if depth >= maxDepth {
+		return
+	}
+	indent := strings.Repeat("  ", depth)
+	fmt.Fprintf(f.writer, "%s- `%s` — flat: %d (%.2f%%), cum: %d (%.2f%%)\n",
+		indent, node.Name, node.Flat, node.FlatPercent, node.Cum, node.CumPercent)
+	for _, child := range node.Children {
+		f.formatDiagnoseNode(child, depth+1, maxDepth)
+	}
+}
+
+// DiagnoseJSONFormatter outputs diagnose prompt as JSON.
+type DiagnoseJSONFormatter struct {
+	writer io.Writer
+}
+
+func NewDiagnoseJSONFormatter(w io.Writer) *DiagnoseJSONFormatter {
+	return &DiagnoseJSONFormatter{writer: w}
+}
+
+func (f *DiagnoseJSONFormatter) FormatDiagnose(dp *profile.DiagnosePrompt) error {
+	output := map[string]interface{}{
+		"prompt":       dp.Text(),
+		"language":     dp.Language,
+		"profile_type": dp.ProfileType,
+		"data": map[string]interface{}{
+			"type":     dp.ProfileType,
+			"samples":  dp.Analysis.SampleCount,
+			"hotspots": convertDiagnoseHotspots(dp.Analysis.Hotspots),
+		},
+	}
+
+	if dp.UserContext != "" {
+		output["user_context"] = dp.UserContext
+	}
+
+	encoder := json.NewEncoder(f.writer)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(output)
+}
+
+func convertDiagnoseHotspots(hotspots []profile.Hotspot) []map[string]interface{} {
+	result := make([]map[string]interface{}, len(hotspots))
+	for i, h := range hotspots {
+		entry := map[string]interface{}{
+			"function":     h.Function,
+			"file":         h.File,
+			"flat":         h.FlatValue,
+			"flat_percent": roundPercent(h.FlatPercent),
+			"cum":          h.CumValue,
+			"cum_percent":  roundPercent(h.CumPercent),
+		}
+		if h.LocationID != nil {
+			entry["location_id"] = *h.LocationID
+		}
+		if h.Address != nil {
+			entry["address"] = *h.Address
+		}
+		if h.Module != nil {
+			entry["module"] = *h.Module
+		}
+		result[i] = entry
+	}
+	return result
+}

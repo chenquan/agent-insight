@@ -20,6 +20,7 @@ Analyzes pprof performance profiles and outputs structured, AI-friendly results.
 
 Core commands:
   analyze  - Analyze pprof files and output performance hotspots
+  diagnose - Generate AI diagnostic prompt from pprof profile
   list     - Query specific function call relationships
   flame    - Generate folded stack format for flame graphs
   diff     - Compare two profiles to identify performance changes
@@ -52,6 +53,7 @@ func init() {
 	rootCmd.AddCommand(commands.MergeCmd)
 	rootCmd.AddCommand(commands.TrendCmd)
 	rootCmd.AddCommand(commands.InitCmd)
+	rootCmd.AddCommand(commands.DiagnoseCmd)
 
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
