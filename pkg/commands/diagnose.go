@@ -43,8 +43,8 @@ func init() {
 func runDiagnose(cmd *cobra.Command, args []string) error {
 	profilePath := args[0]
 
-	if diagnoseFormat != "text" && diagnoseFormat != "json" && diagnoseFormat != "markdown" {
-		return fmt.Errorf("invalid format: %s (must be text, json, or markdown)", diagnoseFormat)
+	if err := ValidateFormat(diagnoseFormat); err != nil {
+		return err
 	}
 
 	loader := profile.NewLoader()

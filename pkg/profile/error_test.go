@@ -87,3 +87,15 @@ func TestErrorFlameInvalidIgnorePattern(t *testing.T) {
 		t.Fatal("expected error for invalid ignore pattern")
 	}
 }
+
+func TestAnalysisZeroTotalValueNoNaN(t *testing.T) {
+	p := createTestProfile(t)
+	// Use an ignore pattern that filters out all functions
+	analysis, err := NewAnalysis(p, AnalysisConfig{TopN: 10, IgnorePattern: ".*", CallDepth: 0})
+	if err != nil {
+		t.Fatalf("NewAnalysis failed: %v", err)
+	}
+	if len(analysis.Hotspots) != 0 {
+		t.Errorf("expected 0 hotspots when all filtered, got %d", len(analysis.Hotspots))
+	}
+}

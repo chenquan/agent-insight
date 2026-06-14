@@ -3,7 +3,6 @@ package commands
 import (
 	"fmt"
 	"os"
-	"regexp"
 
 	"github.com/chenquan/agent-insight/pkg/output"
 	"github.com/chenquan/agent-insight/pkg/profile"
@@ -60,21 +59,17 @@ func runDiff(cmd *cobra.Command, args []string) error {
 	targetPath := args[1]
 
 	// Validate format
-	if diffFormat != "text" && diffFormat != "json" && diffFormat != "markdown" {
-		return fmt.Errorf("invalid format: %s (must be text, json, or markdown)", diffFormat)
+	if err := ValidateFormat(diffFormat); err != nil {
+		return err
 	}
 
 	// Validate regex patterns
-	if diffFocus != "" {
-		if _, err := regexp.Compile(diffFocus); err != nil {
-			return fmt.Errorf("invalid focus pattern: %w", err)
-		}
+	if err := ValidateRegex(diffFocus, "focus"); err != nil {
+		return err
 	}
 
-	if diffIgnore != "" {
-		if _, err := regexp.Compile(diffIgnore); err != nil {
-			return fmt.Errorf("invalid ignore pattern: %w", err)
-		}
+	if err := ValidateRegex(diffIgnore, "ignore"); err != nil {
+		return err
 	}
 
 	// Load profiles

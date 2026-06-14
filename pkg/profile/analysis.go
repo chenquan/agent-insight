@@ -326,11 +326,17 @@ func (a *Analysis) calculateHotspots(p *profile.Profile) ([]Hotspot, error) {
 			continue
 		}
 
+		var flatPct, cumPct float64
+		if totalValue > 0 {
+			flatPct = float64(flat) / float64(totalValue) * 100
+			cumPct = float64(cumMap[locID]) / float64(totalValue) * 100
+		}
+
 		hotspot := Hotspot{
 			FlatValue:   flat,
-			FlatPercent: float64(flat) / float64(totalValue) * 100,
+			FlatPercent: flatPct,
 			CumValue:    cumMap[locID],
-			CumPercent:  float64(cumMap[locID]) / float64(totalValue) * 100,
+			CumPercent:  cumPct,
 		}
 
 		// Extract symbol information from location

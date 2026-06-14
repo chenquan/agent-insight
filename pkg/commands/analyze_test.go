@@ -6,34 +6,44 @@ import (
 	"testing"
 )
 
-func TestAnalyzeCommand_InvalidValueType(t *testing.T) {
+func TestAnalyzeCommand_InvalidFormat(t *testing.T) {
 	var buf bytes.Buffer
 	AnalyzeCmd.SetOut(&buf)
 	AnalyzeCmd.SetErr(&buf)
-	AnalyzeCmd.SetArgs([]string{"../../testdata/heap.pb.gz", "--value-type", "nonexistent_metric"})
+	AnalyzeCmd.SetArgs([]string{"../../testdata/cpu.pb.gz", "--format", "yaml"})
 
 	err := AnalyzeCmd.Execute()
 	if err == nil {
-		t.Fatal("expected error for invalid value type")
+		t.Fatal("expected error for invalid format")
 	}
-
-	if !strings.Contains(err.Error(), "unknown value type") {
-		t.Errorf("error should mention 'unknown value type', got: %v", err)
-	}
-
-	if !strings.Contains(err.Error(), "available:") {
-		t.Errorf("error should list available types, got: %v", err)
+	if !strings.Contains(err.Error(), "invalid format") {
+		t.Errorf("error should mention 'invalid format', got: %v", err)
 	}
 }
 
-func TestAnalyzeCommand_ValidValueType_NoError(t *testing.T) {
+func TestAnalyzeCommand_InvalidFocusPattern(t *testing.T) {
 	var buf bytes.Buffer
 	AnalyzeCmd.SetOut(&buf)
 	AnalyzeCmd.SetErr(&buf)
-	AnalyzeCmd.SetArgs([]string{"../../testdata/heap.pb.gz", "--value-type", "alloc_objects"})
+	AnalyzeCmd.SetArgs([]string{"../../testdata/cpu.pb.gz", "--format", "text", "--focus", "[invalid"})
 
 	err := AnalyzeCmd.Execute()
-	if err != nil {
-		t.Fatalf("valid value-type should not error, got: %v", err)
+	if err == nil {
+		t.Fatal("expected error for invalid focus pattern")
+	}
+	if !strings.Contains(err.Error(), "invalid focus pattern") {
+		t.Errorf("error should mention 'invalid focus pattern', got: %v", err)
+	}
+}
+
+func TestAnalyzeCommand_FileNotFound(t *testing.T) {
+	var buf bytes.Buffer
+	AnalyzeCmd.SetOut(&buf)
+	AnalyzeCmd.SetErr(&buf)
+	AnalyzeCmd.SetArgs([]string{"/nonexistent/profile.pb.gz"})
+
+	err := AnalyzeCmd.Execute()
+	if err == nil {
+		t.Fatal("expected error for nonexistent file")
 	}
 }

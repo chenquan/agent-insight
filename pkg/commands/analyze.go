@@ -3,7 +3,6 @@ package commands
 import (
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 
 	"github.com/chenquan/agent-insight/pkg/output"
@@ -60,8 +59,8 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	profilePath := args[0]
 
 	// Validate format
-	if analyzeFormat != "text" && analyzeFormat != "json" && analyzeFormat != "markdown" {
-		return fmt.Errorf("invalid format: %s (must be text, json, or markdown)", analyzeFormat)
+	if err := ValidateFormat(analyzeFormat); err != nil {
+		return err
 	}
 
 	// Load profile
@@ -79,20 +78,18 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	}
 
 	// Apply focus/ignore filters if provided
+	if err := ValidateRegex(analyzeFocus, "focus"); err != nil {
+		return err
+	}
 	if analyzeFocus != "" {
 		config.FocusPattern = analyzeFocus
-		// Validate regex
-		if _, err := regexp.Compile(analyzeFocus); err != nil {
-			return fmt.Errorf("invalid focus regex: %w", err)
-		}
 	}
 
+	if err := ValidateRegex(analyzeIgnore, "ignore"); err != nil {
+		return err
+	}
 	if analyzeIgnore != "" {
 		config.IgnorePattern = analyzeIgnore
-		// Validate regex
-		if _, err := regexp.Compile(analyzeIgnore); err != nil {
-			return fmt.Errorf("invalid ignore regex: %w", err)
-		}
 	}
 
 	// Apply value type if specified

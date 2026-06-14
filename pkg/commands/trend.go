@@ -3,7 +3,6 @@ package commands
 import (
 	"fmt"
 	"os"
-	"regexp"
 	"sort"
 
 	pprofprofile "github.com/google/pprof/profile"
@@ -68,24 +67,20 @@ type profileEntry struct {
 }
 
 func runTrend(cmd *cobra.Command, args []string) error {
-	if trendFormat != "text" && trendFormat != "json" && trendFormat != "markdown" {
-		return fmt.Errorf("invalid format: %s (must be text, json, or markdown)", trendFormat)
+	if err := ValidateFormat(trendFormat); err != nil {
+		return err
 	}
 
 	if trendSortBy != "mtime" && trendSortBy != "name" {
 		return fmt.Errorf("invalid sort-by: %s (must be mtime or name)", trendSortBy)
 	}
 
-	if trendFocus != "" {
-		if _, err := regexp.Compile(trendFocus); err != nil {
-			return fmt.Errorf("invalid focus pattern: %w", err)
-		}
+	if err := ValidateRegex(trendFocus, "focus"); err != nil {
+		return err
 	}
 
-	if trendIgnore != "" {
-		if _, err := regexp.Compile(trendIgnore); err != nil {
-			return fmt.Errorf("invalid ignore pattern: %w", err)
-		}
+	if err := ValidateRegex(trendIgnore, "ignore"); err != nil {
+		return err
 	}
 
 	loader := profile.NewLoader()

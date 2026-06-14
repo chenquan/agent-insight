@@ -3,7 +3,6 @@ package commands
 import (
 	"fmt"
 	"os"
-	"regexp"
 
 	"github.com/chenquan/agent-insight/pkg/output"
 	"github.com/chenquan/agent-insight/pkg/profile"
@@ -54,21 +53,17 @@ func runFlame(cmd *cobra.Command, args []string) error {
 	profilePath := args[0]
 
 	// Validate format
-	if flameFormat != "text" && flameFormat != "json" && flameFormat != "markdown" {
-		return fmt.Errorf("invalid format: %s (must be text, json, or markdown)", flameFormat)
+	if err := ValidateFormat(flameFormat); err != nil {
+		return err
 	}
 
-	// Validate patterns if provided
-	if flameFocus != "" {
-		if _, err := regexp.Compile(flameFocus); err != nil {
-			return fmt.Errorf("invalid focus pattern: %w", err)
-		}
+	// Validate patterns
+	if err := ValidateRegex(flameFocus, "focus"); err != nil {
+		return err
 	}
 
-	if flameIgnore != "" {
-		if _, err := regexp.Compile(flameIgnore); err != nil {
-			return fmt.Errorf("invalid ignore pattern: %w", err)
-		}
+	if err := ValidateRegex(flameIgnore, "ignore"); err != nil {
+		return err
 	}
 
 	// Load profile
