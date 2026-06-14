@@ -43,7 +43,6 @@ var (
 	trendThreshold     float64
 	trendTop           int
 	trendSortBy        string
-	trendValueType     string
 	trendIncludeNew    bool
 	trendIncludeVolatile bool
 )
@@ -56,7 +55,6 @@ func init() {
 	TrendCmd.Flags().Float64Var(&trendThreshold, "threshold", 5, "Trend threshold percentage for classification")
 	TrendCmd.Flags().IntVar(&trendTop, "top", 10, "Limit to top N in each category")
 	TrendCmd.Flags().StringVar(&trendSortBy, "sort-by", "mtime", "Sort profiles by: mtime, name")
-	TrendCmd.Flags().StringVar(&trendValueType, "value-type", "", "Specify which value type to analyze")
 	TrendCmd.Flags().BoolVar(&trendIncludeNew, "include-new", false, "Include new hotspots in output")
 	TrendCmd.Flags().BoolVar(&trendIncludeVolatile, "include-volatile", false, "Include volatile functions in output")
 }
@@ -192,5 +190,5 @@ func outputTrendJSON(result *profile.TrendResult) error {
 
 func outputTrendMarkdown(result *profile.TrendResult) error {
 	formatter := output.NewTrendMarkdownFormatter(os.Stdout)
-	return formatter.FormatTrendMarkdownResult(result)
+	return formatter.FormatTrendResult(result)
 }

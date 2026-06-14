@@ -1,6 +1,9 @@
 package commands
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestValidateFormat(t *testing.T) {
 	tests := []struct {
@@ -18,6 +21,30 @@ func TestValidateFormat(t *testing.T) {
 		err := ValidateFormat(tt.format)
 		if (err == nil) != tt.want {
 			t.Errorf("ValidateFormat(%q) error = %v, want error = %v", tt.format, err, !tt.want)
+		}
+	}
+}
+
+func TestValidatePositiveInt(t *testing.T) {
+	tests := []struct {
+		value int
+		name  string
+		want  bool
+	}{
+		{10, "top", true},
+		{1, "top", true},
+		{0, "top", false},
+		{-1, "top", false},
+	}
+	for _, tt := range tests {
+		err := ValidatePositiveInt(tt.value, tt.name)
+		if (err == nil) != tt.want {
+			t.Errorf("ValidatePositiveInt(%d, %q) error = %v, want error = %v", tt.value, tt.name, err, !tt.want)
+		}
+		if err != nil && tt.name != "" {
+			if !strings.Contains(err.Error(), tt.name) {
+				t.Errorf("ValidatePositiveInt(%d, %q) error = %v, want error to contain %q", tt.value, tt.name, err, tt.name)
+			}
 		}
 	}
 }

@@ -36,7 +36,6 @@ var (
 	diffFocus       string
 	diffIgnore      string
 	diffFormat      string
-	diffValueType   string
 	diffTop         int
 	diffHideNew     bool
 	diffHideDeleted bool
@@ -48,7 +47,6 @@ func init() {
 	DiffCmd.Flags().StringVar(&diffFocus, "focus", "", "Regex pattern to focus on specific functions")
 	DiffCmd.Flags().StringVar(&diffIgnore, "ignore", "", "Regex pattern to ignore specific functions")
 	DiffCmd.Flags().StringVar(&diffFormat, "format", "text", "Output format: text, json, markdown")
-	DiffCmd.Flags().StringVar(&diffValueType, "value-type", "", "Specify which value type to analyze")
 	DiffCmd.Flags().IntVar(&diffTop, "top", 15, "Limit to top N in each category")
 	DiffCmd.Flags().BoolVar(&diffHideNew, "hide-new", false, "Hide new functions")
 	DiffCmd.Flags().BoolVar(&diffHideDeleted, "hide-deleted", false, "Hide deleted functions")

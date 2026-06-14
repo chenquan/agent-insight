@@ -33,7 +33,6 @@ var (
 	flameIgnore    string
 	flameDepth     int
 	flameTop       int
-	flameValueType string
 	flameStats     bool
 	flameFormat    string
 )
@@ -44,7 +43,6 @@ func init() {
 	FlameCmd.Flags().StringVar(&flameIgnore, "ignore", "", "Regex pattern to ignore specific functions")
 	FlameCmd.Flags().IntVar(&flameDepth, "depth", 0, "Maximum depth of stack traces (0 = unlimited)")
 	FlameCmd.Flags().IntVar(&flameTop, "top", 0, "Limit to top N stacks (0 = unlimited)")
-	FlameCmd.Flags().StringVar(&flameValueType, "value-type", "", "Specify which value type to use")
 	FlameCmd.Flags().BoolVar(&flameStats, "stats", false, "Include statistics in output")
 	FlameCmd.Flags().StringVar(&flameFormat, "format", "text", "Output format: text, json, markdown")
 }
@@ -88,8 +86,12 @@ func runFlame(cmd *cobra.Command, args []string) error {
 	}
 
 	// Output statistics if requested
-	if flameStats && flameFormat == "text" {
-		outputFlameStats(result)
+	if flameStats {
+		if flameFormat == "text" {
+			outputFlameStats(result)
+		} else {
+			fmt.Fprintln(os.Stderr, "warning: --stats is only supported in text format")
+		}
 	}
 
 	// Output based on format

@@ -34,7 +34,6 @@ var (
 	listCalleesOnly bool
 	listExclude     string
 	listFormat      string
-	listValueType   string
 )
 
 func init() {
@@ -44,7 +43,6 @@ func init() {
 	ListCmd.Flags().BoolVar(&listCalleesOnly, "callees-only", false, "Show only callees, exclude callers")
 	ListCmd.Flags().StringVar(&listExclude, "exclude", "", "Regex pattern to exclude from results")
 	ListCmd.Flags().StringVar(&listFormat, "format", "text", "Output format: text, json, markdown")
-	ListCmd.Flags().StringVar(&listValueType, "value-type", "", "Specify which value type to analyze")
 }
 
 func runList(cmd *cobra.Command, args []string) error {

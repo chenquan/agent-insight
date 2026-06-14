@@ -16,7 +16,6 @@ var (
 	treeDepth     int
 	treeTop       int
 	treeCum       bool
-	treeValueType string
 	treeFormat    string
 )
 
@@ -42,7 +41,6 @@ func init() {
 	TreeCmd.Flags().IntVar(&treeDepth, "depth", 5, "Maximum tree depth to display")
 	TreeCmd.Flags().IntVar(&treeTop, "top", 10, "Max children per node")
 	TreeCmd.Flags().BoolVar(&treeCum, "cum", true, "Sort by cumulative value (default true)")
-	TreeCmd.Flags().StringVar(&treeValueType, "value-type", "", "Specify which value type to use")
 	TreeCmd.Flags().StringVar(&treeFormat, "format", "text", "Output format: text, json, markdown")
 }
 

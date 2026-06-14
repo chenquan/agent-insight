@@ -14,6 +14,14 @@ func ValidateFormat(format string) error {
 	return fmt.Errorf("invalid format: %s (must be text, json, or markdown)", format)
 }
 
+// ValidatePositiveInt checks that a value is a positive integer.
+func ValidatePositiveInt(value int, name string) error {
+	if value <= 0 {
+		return fmt.Errorf("invalid %s: must be positive, got %d", name, value)
+	}
+	return nil
+}
+
 // ValidateRegex checks that a regex pattern compiles successfully.
 // Empty patterns are valid (no filtering).
 func ValidateRegex(pattern, name string) error {

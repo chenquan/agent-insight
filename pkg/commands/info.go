@@ -35,8 +35,8 @@ func init() {
 func runInfo(cmd *cobra.Command, args []string) error {
 	profilePath := args[0]
 
-	if infoFormat != "text" && infoFormat != "json" && infoFormat != "markdown" {
-		return fmt.Errorf("invalid format: %s (must be text, json, or markdown)", infoFormat)
+	if err := ValidateFormat(infoFormat); err != nil {
+		return err
 	}
 
 	loader := profile.NewLoader()

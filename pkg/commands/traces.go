@@ -14,7 +14,6 @@ var (
 	tracesFocus     string
 	tracesIgnore    string
 	tracesTop       int
-	tracesValueType string
 	tracesFormat    string
 )
 
@@ -38,7 +37,6 @@ func init() {
 	TracesCmd.Flags().StringVar(&tracesFocus, "focus", "", "Regex pattern to focus on specific functions")
 	TracesCmd.Flags().StringVar(&tracesIgnore, "ignore", "", "Regex pattern to ignore specific functions")
 	TracesCmd.Flags().IntVar(&tracesTop, "top", 20, "Limit to top N traces")
-	TracesCmd.Flags().StringVar(&tracesValueType, "value-type", "", "Specify which value type to use")
 	TracesCmd.Flags().StringVar(&tracesFormat, "format", "text", "Output format: text, json, markdown")
 }
 

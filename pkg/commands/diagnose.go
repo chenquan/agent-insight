@@ -47,6 +47,10 @@ func runDiagnose(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if err := ValidatePositiveInt(diagnoseTop, "top"); err != nil {
+		return err
+	}
+
 	loader := profile.NewLoader()
 	p, err := loader.LoadFromFile(profilePath)
 	if err != nil {

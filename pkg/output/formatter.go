@@ -250,6 +250,13 @@ func formatLocationID(id uint64) string {
 	return fmt.Sprintf("#%d", id)
 }
 
+func safePercent(delta, base int) string {
+	if base == 0 {
+		return "N/A"
+	}
+	return fmt.Sprintf("%.2f%%", float64(delta)/float64(base)*100)
+}
+
 func formatDuration(d time.Duration) string {
 	return d.String()
 }
@@ -798,7 +805,7 @@ type flameJSONOutput struct {
 
 type flameJSONStack struct {
 	Stack []string `json:"stack"`
-	Value int64    `json:"value"`
+	Value int64    `json:"count"`
 }
 
 func (f *FlameFormatter) formatJSON(result *profile.FlameResult) error {
@@ -1246,11 +1253,11 @@ func (f *DiffMarkdownFormatter) FormatDiffResult(result *profile.DiffResult, bas
 	fmt.Fprintf(f.writer, "## Overall Changes\n\n")
 	fmt.Fprintf(f.writer, "| Metric | Base | Target | Delta | Percentage |\n")
 	fmt.Fprintf(f.writer, "|--------|------|--------|-------|------------|\n")
-	fmt.Fprintf(f.writer, "| Samples | %d | %d | %d | %.2f%% |\n",
+	fmt.Fprintf(f.writer, "| Samples | %d | %d | %d | %s |\n",
 		result.OverallDiff.BaseSamples,
 		result.OverallDiff.TargetSamples,
 		result.OverallDiff.TargetSamples-result.OverallDiff.BaseSamples,
-		float64(result.OverallDiff.TargetSamples-result.OverallDiff.BaseSamples)/float64(result.OverallDiff.BaseSamples)*100)
+		safePercent(result.OverallDiff.TargetSamples-result.OverallDiff.BaseSamples, result.OverallDiff.BaseSamples))
 	fmt.Fprintf(f.writer, "| Total Value | %d | %d | %d | %.2f%% |\n\n",
 		result.OverallDiff.BaseTotal,
 		result.OverallDiff.TargetTotal,
@@ -1425,8 +1432,8 @@ func NewTrendMarkdownFormatter(w io.Writer) *TrendMarkdownFormatter {
 	return &TrendMarkdownFormatter{writer: w}
 }
 
-// FormatTrendMarkdownResult formats and outputs the trend result as Markdown
-func (f *TrendMarkdownFormatter) FormatTrendMarkdownResult(result *profile.TrendResult) error {
+// FormatTrendResult formats and outputs the trend result as Markdown
+func (f *TrendMarkdownFormatter) FormatTrendResult(result *profile.TrendResult) error {
 	w := f.writer
 
 	fmt.Fprintf(w, "# Performance Trend Analysis\n\n")
@@ -1493,7 +1500,10 @@ func funcName(ft profile.FunctionTrend) string {
 	if ft.Address != nil {
 		return *ft.Address
 	}
-	return fmt.Sprintf("Location %s", formatLocationID(*ft.LocationID))
+	if ft.LocationID != nil {
+		return fmt.Sprintf("Location %s", formatLocationID(*ft.LocationID))
+	}
+	return "unknown"
 }
 
 func formatSeries(series []*int64) string {
