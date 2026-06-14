@@ -3,7 +3,6 @@ package commands
 import (
 	"fmt"
 	"os"
-	"regexp"
 
 	"github.com/chenquan/agent-insight/pkg/output"
 	"github.com/chenquan/agent-insight/pkg/profile"
@@ -53,20 +52,18 @@ func runList(cmd *cobra.Command, args []string) error {
 	pattern := args[1]
 
 	// Validate format
-	if listFormat != "text" && listFormat != "json" && listFormat != "markdown" {
-		return fmt.Errorf("invalid format: %s (must be text, json, or markdown)", listFormat)
+	if err := ValidateFormat(listFormat); err != nil {
+		return err
 	}
 
 	// Validate regex
-	if _, err := regexp.Compile(pattern); err != nil {
-		return fmt.Errorf("invalid pattern: %w", err)
+	if err := ValidateRegex(pattern, "pattern"); err != nil {
+		return err
 	}
 
-	// Validate exclude pattern if provided
-	if listExclude != "" {
-		if _, err := regexp.Compile(listExclude); err != nil {
-			return fmt.Errorf("invalid exclude pattern: %w", err)
-		}
+	// Validate exclude pattern
+	if err := ValidateRegex(listExclude, "exclude"); err != nil {
+		return err
 	}
 
 	// Load profile

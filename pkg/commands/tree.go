@@ -3,7 +3,6 @@ package commands
 import (
 	"fmt"
 	"os"
-	"regexp"
 
 	"github.com/chenquan/agent-insight/pkg/output"
 	"github.com/chenquan/agent-insight/pkg/profile"
@@ -50,20 +49,16 @@ func init() {
 func runTree(cmd *cobra.Command, args []string) error {
 	profilePath := args[0]
 
-	if treeFormat != "text" && treeFormat != "json" && treeFormat != "markdown" {
-		return fmt.Errorf("invalid format: %s (must be text, json, or markdown)", treeFormat)
+	if err := ValidateFormat(treeFormat); err != nil {
+		return err
 	}
 
-	if treeFocus != "" {
-		if _, err := regexp.Compile(treeFocus); err != nil {
-			return fmt.Errorf("invalid focus pattern: %w", err)
-		}
+	if err := ValidateRegex(treeFocus, "focus"); err != nil {
+		return err
 	}
 
-	if treeIgnore != "" {
-		if _, err := regexp.Compile(treeIgnore); err != nil {
-			return fmt.Errorf("invalid ignore pattern: %w", err)
-		}
+	if err := ValidateRegex(treeIgnore, "ignore"); err != nil {
+		return err
 	}
 
 	loader := profile.NewLoader()

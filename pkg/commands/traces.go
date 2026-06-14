@@ -3,7 +3,6 @@ package commands
 import (
 	"fmt"
 	"os"
-	"regexp"
 
 	"github.com/chenquan/agent-insight/pkg/output"
 	"github.com/chenquan/agent-insight/pkg/profile"
@@ -46,20 +45,16 @@ func init() {
 func runTraces(cmd *cobra.Command, args []string) error {
 	profilePath := args[0]
 
-	if tracesFormat != "text" && tracesFormat != "json" && tracesFormat != "markdown" {
-		return fmt.Errorf("invalid format: %s (must be text, json, or markdown)", tracesFormat)
+	if err := ValidateFormat(tracesFormat); err != nil {
+		return err
 	}
 
-	if tracesFocus != "" {
-		if _, err := regexp.Compile(tracesFocus); err != nil {
-			return fmt.Errorf("invalid focus pattern: %w", err)
-		}
+	if err := ValidateRegex(tracesFocus, "focus"); err != nil {
+		return err
 	}
 
-	if tracesIgnore != "" {
-		if _, err := regexp.Compile(tracesIgnore); err != nil {
-			return fmt.Errorf("invalid ignore pattern: %w", err)
-		}
+	if err := ValidateRegex(tracesIgnore, "ignore"); err != nil {
+		return err
 	}
 
 	loader := profile.NewLoader()
