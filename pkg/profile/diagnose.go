@@ -1,3 +1,4 @@
+//nolint:staticcheck // QF1012: b.WriteString(fmt.Sprintf(...)) is intentional for readability in the template builder
 package profile
 
 import (
@@ -157,7 +158,7 @@ func buildGuidance(profileType, lang string) string {
 		base = baseGuidance["unknown"]
 	}
 
-	addition, _ := languageAddition[lang]
+	addition := languageAddition[lang]
 
 	return base + addition
 }
