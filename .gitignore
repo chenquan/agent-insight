@@ -18,3 +18,5 @@ build/
 bin/
 
 agent-insight
+coverage.out
+docs
