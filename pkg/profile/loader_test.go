@@ -9,9 +9,9 @@ import (
 )
 
 // helper: create a minimal profile and write to a temp file
-func createTestProfile(t *testing.T) *pprofprofile.Profile {
+func createTestProfile(t *testing.T) *Profile {
 	t.Helper()
-	p := &pprofprofile.Profile{
+	raw := &pprofprofile.Profile{
 		PeriodType: &pprofprofile.ValueType{Type: "cpu", Unit: "nanoseconds"},
 		Period:     10000000,
 		SampleType: []*pprofprofile.ValueType{
@@ -21,16 +21,16 @@ func createTestProfile(t *testing.T) *pprofprofile.Profile {
 	fn := &pprofprofile.Function{ID: 1, Name: "main.foo", Filename: "main.go"}
 	m := &pprofprofile.Mapping{ID: 1, Start: 0x1000, Limit: 0x2000, File: "/bin/app"}
 	loc := &pprofprofile.Location{ID: 1, Mapping: m, Address: 0x1100, Line: []pprofprofile.Line{{Function: fn, Line: 10}}}
-	p.Function = []*pprofprofile.Function{fn}
-	p.Mapping = []*pprofprofile.Mapping{m}
-	p.Location = []*pprofprofile.Location{loc}
-	p.Sample = []*pprofprofile.Sample{
+	raw.Function = []*pprofprofile.Function{fn}
+	raw.Mapping = []*pprofprofile.Mapping{m}
+	raw.Location = []*pprofprofile.Location{loc}
+	raw.Sample = []*pprofprofile.Sample{
 		{Location: []*pprofprofile.Location{loc}, Value: []int64{100}},
 	}
-	return p
+	return NewProfile(raw)
 }
 
-func writeProfileToTemp(t *testing.T, p *pprofprofile.Profile) string {
+func writeProfileToTemp(t *testing.T, p *Profile) string {
 	t.Helper()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.pb.gz")
@@ -152,7 +152,7 @@ func TestDiffCommand(t *testing.T) {
 	base := createTestProfile(t)
 
 	// Create target with different values
-	target := &pprofprofile.Profile{
+	rawTarget := &pprofprofile.Profile{
 		PeriodType: &pprofprofile.ValueType{Type: "cpu", Unit: "nanoseconds"},
 		Period:     10000000,
 		SampleType: []*pprofprofile.ValueType{
@@ -162,12 +162,13 @@ func TestDiffCommand(t *testing.T) {
 	fn := &pprofprofile.Function{ID: 1, Name: "main.foo", Filename: "main.go"}
 	m := &pprofprofile.Mapping{ID: 1, Start: 0x1000, Limit: 0x2000, File: "/bin/app"}
 	loc := &pprofprofile.Location{ID: 1, Mapping: m, Address: 0x1100, Line: []pprofprofile.Line{{Function: fn, Line: 10}}}
-	target.Function = []*pprofprofile.Function{fn}
-	target.Mapping = []*pprofprofile.Mapping{m}
-	target.Location = []*pprofprofile.Location{loc}
-	target.Sample = []*pprofprofile.Sample{
+	rawTarget.Function = []*pprofprofile.Function{fn}
+	rawTarget.Mapping = []*pprofprofile.Mapping{m}
+	rawTarget.Location = []*pprofprofile.Location{loc}
+	rawTarget.Sample = []*pprofprofile.Sample{
 		{Location: []*pprofprofile.Location{loc}, Value: []int64{200}}, // Doubled
 	}
+	target := NewProfile(rawTarget)
 
 	result, err := Diff(base, target, DiffConfig{})
 	if err != nil {

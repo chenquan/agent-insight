@@ -32,7 +32,7 @@ func TestNoSymbolInfo(t *testing.T) {
 		{Location: []*pprofprofile.Location{symLoc}, Value: []int64{200}},
 	}
 
-	analysis, err := NewAnalysis(p, AnalysisConfig{TopN: 10, CallDepth: 0})
+	analysis, err := NewAnalysis(NewProfile(p), AnalysisConfig{TopN: 10, CallDepth: 0})
 	if err != nil {
 		t.Fatalf("NewAnalysis failed: %v", err)
 	}

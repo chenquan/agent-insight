@@ -5,8 +5,6 @@ import (
 	"os"
 	"sort"
 
-	pprofprofile "github.com/google/pprof/profile"
-
 	"github.com/chenquan/agent-insight/pkg/output"
 	"github.com/chenquan/agent-insight/pkg/profile"
 
@@ -129,7 +127,7 @@ func runTrend(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load profiles and build time points
-	var profiles []*pprofprofile.Profile
+	var profiles []*profile.Profile
 	var timePoints []profile.TimePoint
 	for _, e := range entries {
 		p, err := loader.LoadFromFile(e.path)

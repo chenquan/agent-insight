@@ -31,7 +31,7 @@ func TestMultiValueType(t *testing.T) {
 	}
 
 	// Test: default value type should be selected automatically
-	analysis, err := NewAnalysis(p, AnalysisConfig{TopN: 10, CallDepth: 0})
+	analysis, err := NewAnalysis(NewProfile(p), AnalysisConfig{TopN: 10, CallDepth: 0})
 	if err != nil {
 		t.Fatalf("NewAnalysis failed: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestUserSpecifiedValueType(t *testing.T) {
 	}
 
 	// Analyze with alloc_objects (index 0) — value should be 1000
-	allocAnalysis, err := NewAnalysis(p, AnalysisConfig{
+	allocAnalysis, err := NewAnalysis(NewProfile(p), AnalysisConfig{
 		TopN: 10,
 		ValueType: &ValueTypeConfig{Name: "alloc_objects", Unit: "count", Index: 0},
 	})
@@ -92,7 +92,7 @@ func TestUserSpecifiedValueType(t *testing.T) {
 	}
 
 	// Analyze with inuse_space (index 3) — value should be 419430400
-	inuseAnalysis, err := NewAnalysis(p, AnalysisConfig{
+	inuseAnalysis, err := NewAnalysis(NewProfile(p), AnalysisConfig{
 		TopN: 10,
 		ValueType: &ValueTypeConfig{Name: "inuse_space", Unit: "bytes", Index: 3},
 	})

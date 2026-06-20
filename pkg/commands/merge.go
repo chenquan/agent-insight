@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	pprofprofile "github.com/google/pprof/profile"
-
 	"github.com/chenquan/agent-insight/pkg/profile"
 
 	"github.com/spf13/cobra"
@@ -70,7 +68,7 @@ func runMerge(cmd *cobra.Command, args []string) error {
 
 	// Load all profiles
 	loader := profile.NewLoader()
-	var profiles []*pprofprofile.Profile
+	var profiles []*profile.Profile
 
 	for _, p := range profilePaths {
 		pf, err := loader.LoadFromFile(p)
@@ -99,7 +97,7 @@ func runMerge(cmd *cobra.Command, args []string) error {
 }
 
 // writeMergeOutput writes the merged profile as gzip-compressed protobuf.
-func writeMergeOutput(p *pprofprofile.Profile, outputPath string) error {
+func writeMergeOutput(p *profile.Profile, outputPath string) error {
 	f, err := os.Create(outputPath)
 	if err != nil {
 		return err

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/pprof/profile"
 )
 
 // InfoResult contains profile metadata without performing sample-level computation.
@@ -23,6 +22,14 @@ type InfoResult struct {
 	Mappings     []MappingInfo
 	TimeRange    TimeRangeInfo
 	Comments     []string
+	LabelSummary *LabelSummaryBrief
+}
+
+// LabelSummaryBrief is a one-line label overview attached to InfoResult.
+// The full value distribution lives in the tags command; info only reports counts.
+type LabelSummaryBrief struct {
+	KeyCount       int
+	DistinctValues int
 }
 
 // ValueTypeDesc describes a sample value type.
@@ -49,7 +56,7 @@ type TimeRangeInfo struct {
 }
 
 // Info reads profile metadata without performing sample-level computation.
-func Info(p *profile.Profile) (*InfoResult, error) {
+func Info(p *Profile) (*InfoResult, error) {
 	if p == nil {
 		return nil, fmt.Errorf("profile is nil")
 	}
@@ -120,6 +127,18 @@ func Info(p *profile.Profile) (*InfoResult, error) {
 	// Detect profile type from PeriodType
 	if p.PeriodType != nil {
 		result.Type = p.PeriodType.Type
+	}
+
+	// Label summary (one-line overview; full distribution is the tags command).
+	// Read from the cached LabelSummaries rather than re-scanning samples.
+	keyCount := len(p.LabelSummaries)
+	distinctValues := 0
+	for _, ls := range p.LabelSummaries {
+		distinctValues += ls.Distinct
+	}
+	result.LabelSummary = &LabelSummaryBrief{
+		KeyCount:       keyCount,
+		DistinctValues: distinctValues,
 	}
 
 	return result, nil

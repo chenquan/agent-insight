@@ -3,19 +3,19 @@ package profile
 import (
 	"testing"
 
-	"github.com/google/pprof/profile"
+	pprofprofile "github.com/google/pprof/profile"
 )
 
 func TestTrendRequiresMinimumProfiles(t *testing.T) {
 	p := createTestCPUProfile(100)
 	tp := TimePoint{Label: "p1", Time: 1}
 
-	_, err := Trend([]*profile.Profile{p}, []TimePoint{tp}, TrendConfig{})
+	_, err := Trend([]*Profile{p}, []TimePoint{tp}, TrendConfig{})
 	if err == nil {
 		t.Fatal("expected error for < 3 profiles")
 	}
 
-	_, err = Trend([]*profile.Profile{p, p}, []TimePoint{{Label: "a", Time: 1}, {Label: "b", Time: 2}}, TrendConfig{})
+	_, err = Trend([]*Profile{p, p}, []TimePoint{{Label: "a", Time: 1}, {Label: "b", Time: 2}}, TrendConfig{})
 	if err == nil {
 		t.Fatal("expected error for 2 profiles")
 	}
@@ -25,7 +25,7 @@ func TestTrendProfileTimePointMismatch(t *testing.T) {
 	p := createTestCPUProfile(100)
 	tp := []TimePoint{{Label: "a", Time: 1}, {Label: "b", Time: 2}, {Label: "c", Time: 3}}
 
-	_, err := Trend([]*profile.Profile{p, p}, tp, TrendConfig{})
+	_, err := Trend([]*Profile{p, p}, tp, TrendConfig{})
 	if err == nil {
 		t.Fatal("expected error for profile/timepoint count mismatch")
 	}
@@ -43,7 +43,7 @@ func TestTrendBasic(t *testing.T) {
 		{Label: "p3", Time: 3},
 	}
 
-	result, err := Trend([]*profile.Profile{p1, p2, p3}, tp, TrendConfig{Threshold: 5, TopN: 10})
+	result, err := Trend([]*Profile{p1, p2, p3}, tp, TrendConfig{Threshold: 5, TopN: 10})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestTrendImproving(t *testing.T) {
 
 	tp := []TimePoint{{Label: "p1", Time: 1}, {Label: "p2", Time: 2}, {Label: "p3", Time: 3}}
 
-	result, err := Trend([]*profile.Profile{p1, p2, p3}, tp, TrendConfig{Threshold: 5})
+	result, err := Trend([]*Profile{p1, p2, p3}, tp, TrendConfig{Threshold: 5})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestTrendStable(t *testing.T) {
 
 	tp := []TimePoint{{Label: "p1", Time: 1}, {Label: "p2", Time: 2}, {Label: "p3", Time: 3}}
 
-	result, err := Trend([]*profile.Profile{p1, p2, p3}, tp, TrendConfig{Threshold: 5})
+	result, err := Trend([]*Profile{p1, p2, p3}, tp, TrendConfig{Threshold: 5})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestTrendMissingFunction(t *testing.T) {
 
 	tp := []TimePoint{{Label: "p1", Time: 1}, {Label: "p2", Time: 2}, {Label: "p3", Time: 3}}
 
-	result, err := Trend([]*profile.Profile{p1, p2, p3}, tp, TrendConfig{Threshold: 5, MinImpact: 0})
+	result, err := Trend([]*Profile{p1, p2, p3}, tp, TrendConfig{Threshold: 5, MinImpact: 0})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestTrendFocusFilter(t *testing.T) {
 
 	tp := []TimePoint{{Label: "p1", Time: 1}, {Label: "p2", Time: 2}, {Label: "p3", Time: 3}}
 
-	result, err := Trend([]*profile.Profile{p1, p2, p3}, tp, TrendConfig{
+	result, err := Trend([]*Profile{p1, p2, p3}, tp, TrendConfig{
 		Threshold: 5,
 		FocusPattern: "^main\\.",
 		MinImpact:   0,
@@ -162,7 +162,7 @@ func TestTrendMinImpactFilter(t *testing.T) {
 
 	tp := []TimePoint{{Label: "p1", Time: 1}, {Label: "p2", Time: 2}, {Label: "p3", Time: 3}}
 
-	result, err := Trend([]*profile.Profile{p1, p2, p3}, tp, TrendConfig{
+	result, err := Trend([]*Profile{p1, p2, p3}, tp, TrendConfig{
 		Threshold: 5,
 		MinImpact: 1, // tiny.func is < 1% at every point
 	})
@@ -185,7 +185,7 @@ func TestTrendNewHotspots(t *testing.T) {
 
 	tp := []TimePoint{{Label: "p1", Time: 1}, {Label: "p2", Time: 2}, {Label: "p3", Time: 3}}
 
-	result, err := Trend([]*profile.Profile{p1, p2, p3}, tp, TrendConfig{
+	result, err := Trend([]*Profile{p1, p2, p3}, tp, TrendConfig{
 		Threshold:   5,
 		MinImpact:   0,
 		IncludeNew: true,
@@ -213,7 +213,7 @@ func TestTrendVolatile(t *testing.T) {
 
 	tp := []TimePoint{{Label: "p1", Time: 1}, {Label: "p2", Time: 2}, {Label: "p3", Time: 3}}
 
-	result, err := Trend([]*profile.Profile{p1, p2, p3}, tp, TrendConfig{
+	result, err := Trend([]*Profile{p1, p2, p3}, tp, TrendConfig{
 		Threshold:       50, // high threshold so it stays "stable"
 		MinImpact:       0,
 		IncludeVolatile: true,
@@ -234,7 +234,7 @@ func TestTrendOverallSlope(t *testing.T) {
 
 	tp := []TimePoint{{Label: "p1", Time: 1}, {Label: "p2", Time: 2}, {Label: "p3", Time: 3}}
 
-	result, err := Trend([]*profile.Profile{p1, p2, p3}, tp, TrendConfig{MinImpact: 0})
+	result, err := Trend([]*Profile{p1, p2, p3}, tp, TrendConfig{MinImpact: 0})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -268,62 +268,62 @@ func TestLinearRegression(t *testing.T) {
 
 // Helper functions
 
-func createTestCPUProfile(totalSamples int) *profile.Profile {
-	mallocgc := &profile.Function{ID: 1, Name: "runtime.mallocgc", SystemName: "runtime.mallocgc", Filename: "runtime/malloc.go"}
-	mapping := &profile.Mapping{ID: 1, Start: 0x1000, Limit: 0x2000, File: "/usr/local/bin/myapp"}
-	loc := &profile.Location{ID: 1, Mapping: mapping, Address: 0x1100, Line: []profile.Line{{Function: mallocgc, Line: 1020}}}
+func createTestCPUProfile(totalSamples int) *Profile {
+	mallocgc := &pprofprofile.Function{ID: 1, Name: "runtime.mallocgc", SystemName: "runtime.mallocgc", Filename: "runtime/malloc.go"}
+	mapping := &pprofprofile.Mapping{ID: 1, Start: 0x1000, Limit: 0x2000, File: "/usr/local/bin/myapp"}
+	loc := &pprofprofile.Location{ID: 1, Mapping: mapping, Address: 0x1100, Line: []pprofprofile.Line{{Function: mallocgc, Line: 1020}}}
 
-	return &profile.Profile{
-		PeriodType:    &profile.ValueType{Type: "cpu", Unit: "nanoseconds"},
-		SampleType:    []*profile.ValueType{{Type: "samples", Unit: "count"}, {Type: "cpu", Unit: "nanoseconds"}},
-		Function:      []*profile.Function{mallocgc},
-		Mapping:       []*profile.Mapping{mapping},
-		Location:      []*profile.Location{loc},
-		Sample:        []*profile.Sample{{Location: []*profile.Location{loc}, Value: []int64{int64(totalSamples), int64(totalSamples) * 10000000}}},
-	}
+	return NewProfile(&pprofprofile.Profile{
+		PeriodType:    &pprofprofile.ValueType{Type: "cpu", Unit: "nanoseconds"},
+		SampleType:    []*pprofprofile.ValueType{{Type: "samples", Unit: "count"}, {Type: "cpu", Unit: "nanoseconds"}},
+		Function:      []*pprofprofile.Function{mallocgc},
+		Mapping:       []*pprofprofile.Mapping{mapping},
+		Location:      []*pprofprofile.Location{loc},
+		Sample:        []*pprofprofile.Sample{{Location: []*pprofprofile.Location{loc}, Value: []int64{int64(totalSamples), int64(totalSamples) * 10000000}}},
+	})
 }
 
-func createSingleFuncProfile(funcName string, flatValue int, filename string) *profile.Profile {
-	fn := &profile.Function{ID: 1, Name: funcName, SystemName: funcName, Filename: filename}
-	mapping := &profile.Mapping{ID: 1, Start: 0x1000, Limit: 0x2000, File: "/usr/local/bin/myapp"}
-	loc := &profile.Location{ID: 1, Mapping: mapping, Address: 0x1100, Line: []profile.Line{{Function: fn, Line: 10}}}
+func createSingleFuncProfile(funcName string, flatValue int, filename string) *Profile {
+	fn := &pprofprofile.Function{ID: 1, Name: funcName, SystemName: funcName, Filename: filename}
+	mapping := &pprofprofile.Mapping{ID: 1, Start: 0x1000, Limit: 0x2000, File: "/usr/local/bin/myapp"}
+	loc := &pprofprofile.Location{ID: 1, Mapping: mapping, Address: 0x1100, Line: []pprofprofile.Line{{Function: fn, Line: 10}}}
 
-	return &profile.Profile{
-		PeriodType:    &profile.ValueType{Type: "cpu", Unit: "nanoseconds"},
-		SampleType:    []*profile.ValueType{{Type: "samples", Unit: "count"}, {Type: "cpu", Unit: "nanoseconds"}},
-		Function:      []*profile.Function{fn},
-		Mapping:       []*profile.Mapping{mapping},
-		Location:      []*profile.Location{loc},
-		Sample:        []*profile.Sample{{Location: []*profile.Location{loc}, Value: []int64{int64(flatValue), int64(flatValue) * 10000000}}},
-	}
+	return NewProfile(&pprofprofile.Profile{
+		PeriodType:    &pprofprofile.ValueType{Type: "cpu", Unit: "nanoseconds"},
+		SampleType:    []*pprofprofile.ValueType{{Type: "samples", Unit: "count"}, {Type: "cpu", Unit: "nanoseconds"}},
+		Function:      []*pprofprofile.Function{fn},
+		Mapping:       []*pprofprofile.Mapping{mapping},
+		Location:      []*pprofprofile.Location{loc},
+		Sample:        []*pprofprofile.Sample{{Location: []*pprofprofile.Location{loc}, Value: []int64{int64(flatValue), int64(flatValue) * 10000000}}},
+	})
 }
 
-func createMultiFuncProfile(funcs map[string]int64) *profile.Profile {
-	var fns []*profile.Function
-	var locs []*profile.Location
-	var samples []*profile.Sample
+func createMultiFuncProfile(funcs map[string]int64) *Profile {
+	var fns []*pprofprofile.Function
+	var locs []*pprofprofile.Location
+	var samples []*pprofprofile.Sample
 
-	mapping := &profile.Mapping{ID: 1, Start: 0x1000, Limit: 0x2000, File: "/usr/local/bin/myapp"}
+	mapping := &pprofprofile.Mapping{ID: 1, Start: 0x1000, Limit: 0x2000, File: "/usr/local/bin/myapp"}
 
 	i := 1
 	for name, val := range funcs {
-		fn := &profile.Function{ID: uint64(i), Name: name, SystemName: name, Filename: "main.go"}
-		loc := &profile.Location{ID: uint64(i), Mapping: mapping, Address: 0x1000 + uint64(i)*0x100, Line: []profile.Line{{Function: fn, Line: 10}}}
+		fn := &pprofprofile.Function{ID: uint64(i), Name: name, SystemName: name, Filename: "main.go"}
+		loc := &pprofprofile.Location{ID: uint64(i), Mapping: mapping, Address: 0x1000 + uint64(i)*0x100, Line: []pprofprofile.Line{{Function: fn, Line: 10}}}
 		fns = append(fns, fn)
 		locs = append(locs, loc)
-		samples = append(samples, &profile.Sample{
-			Location: []*profile.Location{loc},
+		samples = append(samples, &pprofprofile.Sample{
+			Location: []*pprofprofile.Location{loc},
 			Value:    []int64{val, val * 10000000},
 		})
 		i++
 	}
 
-	return &profile.Profile{
-		PeriodType: &profile.ValueType{Type: "cpu", Unit: "nanoseconds"},
-		SampleType: []*profile.ValueType{{Type: "samples", Unit: "count"}, {Type: "cpu", Unit: "nanoseconds"}},
+	return NewProfile(&pprofprofile.Profile{
+		PeriodType: &pprofprofile.ValueType{Type: "cpu", Unit: "nanoseconds"},
+		SampleType: []*pprofprofile.ValueType{{Type: "samples", Unit: "count"}, {Type: "cpu", Unit: "nanoseconds"}},
 		Function:   fns,
-		Mapping:    []*profile.Mapping{mapping},
+		Mapping:    []*pprofprofile.Mapping{mapping},
 		Location:   locs,
 		Sample:     samples,
-	}
+	})
 }

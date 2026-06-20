@@ -8,7 +8,7 @@ A lightweight pprof analysis CLI for AI coding assistants. Works with any pprof-
 - **AI-Friendly Output**: Structured JSON format optimized for LLM parsing
 - **Symbol Fallback**: Gracefully handles production profiles without debug symbols
 - **Multi-Value Support**: Smart defaults for complex profile types (Go, C++, etc.)
-- **Nine Core Commands**: analyze, list, flame, diff, merge, trend, info, traces, tree, init
+- **Core Commands**: info, analyze, tags, list, traces, tree, flame, diff, merge, trend, diagnose, init
 
 ## Installation
 
@@ -31,6 +31,15 @@ agent-insight info cpu.pb.gz --format json
 
 Zero-computation overview: type, duration, sample count, value types, symbol status, mappings.
 
+### tags - List pprof labels
+
+```bash
+agent-insight tags goroutine.pb.gz
+agent-insight tags service.pb.gz --top 20 --format json
+```
+
+Discovery layer: lists all pprof labels (`Sample.Label`) and their value distribution. Run it before `--tag` filtering to see which labels exist.
+
 ### analyze - Analyze performance hotspots
 
 ```bash
@@ -38,6 +47,8 @@ agent-insight analyze profile.pb.gz
 agent-insight analyze profile.pb.gz --top 20 --cum
 agent-insight analyze profile.pb.gz --format json --focus "runtime.*"
 agent-insight analyze profile.pb.gz --collapse              # include folded stacks
+agent-insight analyze goroutine.pb.gz --tag state=blocked        # filter samples by label
+agent-insight analyze goroutine.pb.gz --tag-breakdown-on state   # per-function label distribution
 ```
 
 ### list - Query function call relationships
@@ -46,6 +57,8 @@ agent-insight analyze profile.pb.gz --collapse              # include folded sta
 agent-insight list profile.pb.gz "main.*"
 agent-insight list profile.pb.gz "runtime.mallocgc" --callers-only
 agent-insight list profile.pb.gz "encoding.*" --depth 3 --format json
+agent-insight list goroutine.pb.gz "Query" --tag state=blocked           # filter samples by label
+agent-insight list profile.pb.gz "main.*" --ignore-function "runtime.*"  # exclude functions (was --exclude)
 ```
 
 ### flame - Generate folded stack format
@@ -61,6 +74,7 @@ agent-insight flame profile.pb.gz | flamegraph.pl > graph.svg
 ```bash
 agent-insight traces profile.pb.gz
 agent-insight traces profile.pb.gz --focus "runtime.*" --top 10
+agent-insight traces goroutine.pb.gz --tag state=blocked --format json
 ```
 
 Complements flame's aggregated view with per-sample call chains.
@@ -78,6 +92,7 @@ agent-insight tree profile.pb.gz --depth 3 --top 5 --focus "main.*"
 agent-insight diff before.prof after.prof
 agent-insight diff base.prof target.prof --min-delta 10 --format json
 agent-insight diff base.prof target.prof --hide-new --hide-deleted
+agent-insight diff v1.pb.gz v2.pb.gz --tag http.status=500   # diff only 5xx samples (same filter on both)
 ```
 
 ### trend - Analyze performance trends
@@ -109,6 +124,25 @@ Most commands support `--focus <regex>` and `--ignore <regex>`:
 ```bash
 agent-insight analyze profile.pb.gz --focus "main.*" --ignore "runtime.*"
 ```
+
+## pprof Labels (tags)
+
+Profiles may carry pprof labels on each sample (e.g. goroutine `state`/`wait_reason`, service `http.method`/`http.status`). `analyze`, `list`, `traces`, and `diff` support label filtering:
+
+```bash
+# Same key repeated = OR; different keys = AND
+agent-insight analyze goroutine.pb.gz --tag state=blocked --tag state=running
+agent-insight analyze goroutine.pb.gz --tag state=blocked --tag-ignore wait_reason=IO
+agent-insight analyze goroutine.pb.gz --tag-breakdown-on state --tag-breakdown-top 10
+```
+
+- `--tag key=value`: keep samples matching (repeatable; same key OR, across keys AND)
+- `--tag-ignore key=value`: drop samples matching (same semantics, inverted)
+- `--tag-breakdown-on k1,k2` / `--tag-breakdown-top N` (analyze only): per-function flat distribution across label values
+
+Use `tags` to discover available labels first. A filter matching 0 samples exits with an error.
+
+> **BREAKING**: the `list` command's `--exclude` flag is renamed to `--ignore-function` (same semantics — regex-exclude functions). The new `--tag-ignore key=value` is a separate flag for label filtering.
 
 ## Profile Types
 

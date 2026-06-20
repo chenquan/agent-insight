@@ -24,6 +24,10 @@ type Analysis struct {
 	// Call stack paths (aggregated by path)
 	CallPaths []CallPath
 
+	// Label breakdowns for the top hotspots (aligned positionally with
+	// Hotspots[:len(LabelBreakdowns)]). Empty unless BreakdownConfig.Keys is set.
+	LabelBreakdowns []FunctionLabelBreakdown
+
 	// Configuration used for analysis
 	Config AnalysisConfig
 }
@@ -83,10 +87,11 @@ type AnalysisConfig struct {
 	IgnorePattern string        // Regex pattern to ignore
 	ValueType     *ValueTypeConfig // Which value type to analyze
 	CallDepth     int           // Maximum depth of call stack paths to extract
+	Breakdown     *BreakdownConfig // Optional label breakdown for top hotspots
 }
 
 // NewAnalysis creates a new analysis from a pprof profile
-func NewAnalysis(p *profile.Profile, config AnalysisConfig) (*Analysis, error) {
+func NewAnalysis(p *Profile, config AnalysisConfig) (*Analysis, error) {
 	if p == nil {
 		return nil, fmt.Errorf("profile is nil")
 	}
@@ -128,11 +133,18 @@ func NewAnalysis(p *profile.Profile, config AnalysisConfig) (*Analysis, error) {
 		analysis.CallPaths = analysis.calculateCallPaths(p)
 	}
 
+	// Calculate label breakdowns for top hotspots if requested
+	if config.Breakdown != nil && len(config.Breakdown.Keys) > 0 && config.ValueType != nil {
+		bdCfg := *config.Breakdown
+		bdCfg.ValueIndex = config.ValueType.Index
+		analysis.LabelBreakdowns = ComputeFunctionBreakdowns(p, analysis.Hotspots, bdCfg)
+	}
+
 	return analysis, nil
 }
 
 // extractMetadata extracts metadata from the profile
-func extractMetadata(p *profile.Profile) Metadata {
+func extractMetadata(p *Profile) Metadata {
 	metadata := Metadata{
 		Functions: len(p.Function),
 		Locations: len(p.Location),
@@ -162,7 +174,7 @@ func extractMetadata(p *profile.Profile) Metadata {
 }
 
 // inferProfileType infers the profile type from SampleType when PeriodType is missing or empty.
-func inferProfileType(p *profile.Profile) string {
+func inferProfileType(p *Profile) string {
 	for _, st := range p.SampleType {
 		switch st.Type {
 		case "inuse_space", "alloc_space", "inuse_objects", "alloc_objects":
@@ -189,7 +201,7 @@ func normalizeMappingFile(file string) string {
 }
 
 // selectDefaultValueType intelligently selects the default value type based on profile type
-func selectDefaultValueType(p *profile.Profile, profileType string) *ValueTypeConfig {
+func selectDefaultValueType(p *Profile, profileType string) *ValueTypeConfig {
 	if len(p.SampleType) == 0 {
 		return nil
 	}
@@ -245,7 +257,7 @@ func selectDefaultValueType(p *profile.Profile, profileType string) *ValueTypeCo
 }
 
 // calculateHotspots calculates flat and cumulative values for each function
-func (a *Analysis) calculateHotspots(p *profile.Profile) ([]Hotspot, error) {
+func (a *Analysis) calculateHotspots(p *Profile) ([]Hotspot, error) {
 	if a.Config.ValueType == nil {
 		return nil, fmt.Errorf("value type not configured")
 	}
@@ -387,7 +399,7 @@ func getLocationDisplayName(loc *profile.Location) string {
 }
 
 // findLocationByID finds a location by its ID in the profile
-func findLocationByID(p *profile.Profile, id uint64) *profile.Location {
+func findLocationByID(p *Profile, id uint64) *profile.Location {
 	for _, loc := range p.Location {
 		if loc.ID == id {
 			return loc
@@ -419,7 +431,7 @@ func extractSymbolInfo(loc *profile.Location, hotspot *Hotspot) {
 }
 
 // shouldIncludeSample checks if a sample should be included based on focus/ignore patterns
-func shouldIncludeSample(sample *profile.Sample, focusRegex, ignoreRegex *regexp.Regexp, p *profile.Profile) bool {
+func shouldIncludeSample(sample *profile.Sample, focusRegex, ignoreRegex *regexp.Regexp, p *Profile) bool {
 	// Build list of function names in this sample's stack
 	var functions []string
 	for _, loc := range sample.Location {
@@ -458,7 +470,7 @@ func shouldIncludeSample(sample *profile.Sample, focusRegex, ignoreRegex *regexp
 }
 
 // calculateCallPaths aggregates call stack paths from samples
-func (a *Analysis) calculateCallPaths(p *profile.Profile) []CallPath {
+func (a *Analysis) calculateCallPaths(p *Profile) []CallPath {
 	if a.Config.ValueType == nil {
 		return nil
 	}

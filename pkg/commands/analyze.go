@@ -2,7 +2,7 @@ package commands
 
 import (
 	"fmt"
-	"os"
+	"io"
 	"strings"
 
 	"github.com/chenquan/agent-insight/pkg/output"
@@ -33,14 +33,18 @@ Example usage:
 
 // Analyze flags
 var (
-	analyzeTop       int
-	analyzeCum       bool
-	analyzeFocus     string
-	analyzeIgnore    string
-	analyzeFormat    string
-	analyzeCallDepth int
-	analyzeCollapse  bool
-	analyzeValueType string
+	analyzeTop            int
+	analyzeCum            bool
+	analyzeFocus          string
+	analyzeIgnore         string
+	analyzeFormat         string
+	analyzeCallDepth      int
+	analyzeCollapse       bool
+	analyzeValueType      string
+	analyzeTag            []string
+	analyzeTagIgnore      []string
+	analyzeBreakdownOn    string
+	analyzeBreakdownTop   int
 )
 
 func init() {
@@ -53,6 +57,10 @@ func init() {
 	AnalyzeCmd.Flags().IntVar(&analyzeCallDepth, "call-depth", 5, "Call stack depth for path output")
 	AnalyzeCmd.Flags().BoolVar(&analyzeCollapse, "collapse", false, "Include collapsed stack format output")
 	AnalyzeCmd.Flags().StringVar(&analyzeValueType, "value-type", "", "Specify which value type to analyze (for multi-value profiles)")
+	AnalyzeCmd.Flags().StringSliceVar(&analyzeTag, "tag", nil, "Filter samples by pprof label key=value (repeatable; same key OR, across keys AND)")
+	AnalyzeCmd.Flags().StringSliceVar(&analyzeTagIgnore, "tag-ignore", nil, "Exclude samples by pprof label key=value (same semantics as --tag)")
+	AnalyzeCmd.Flags().StringVar(&analyzeBreakdownOn, "tag-breakdown-on", "", "Comma-separated label keys to expand per-function label breakdown")
+	AnalyzeCmd.Flags().IntVar(&analyzeBreakdownTop, "tag-breakdown-top", 20, "Number of top functions to expand label breakdown for")
 }
 
 func runAnalyze(cmd *cobra.Command, args []string) error {
@@ -68,6 +76,16 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	p, err := loader.LoadFromFile(profilePath)
 	if err != nil {
 		return fmt.Errorf("failed to load profile: %w", err)
+	}
+
+	// Apply pprof label filter (--tag / --tag-ignore) before analysis.
+	labelFilter, err := profile.NewLabelFilter(analyzeTag, analyzeTagIgnore)
+	if err != nil {
+		return err
+	}
+	p, err = labelFilter.Apply(p)
+	if err != nil {
+		return err
 	}
 
 	// Configure analysis
@@ -90,6 +108,15 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	}
 	if analyzeIgnore != "" {
 		config.IgnorePattern = analyzeIgnore
+	}
+
+	// Configure label breakdown if requested.
+	if analyzeBreakdownOn != "" {
+		keys := splitCSV(analyzeBreakdownOn)
+		config.Breakdown = &profile.BreakdownConfig{
+			Keys: keys,
+			Top:  analyzeBreakdownTop,
+		}
 	}
 
 	// Apply value type if specified
@@ -122,17 +149,18 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 	}
 
 	// Generate output based on format
+	out := cmd.OutOrStdout()
 	switch analyzeFormat {
 	case "json":
-		if err := outputJSON(analysis); err != nil {
+		if err := outputJSON(analysis, out); err != nil {
 			return err
 		}
 	case "markdown":
-		if err := outputMarkdown(analysis); err != nil {
+		if err := outputMarkdown(analysis, out); err != nil {
 			return err
 		}
 	default:
-		if err := outputText(analysis); err != nil {
+		if err := outputText(analysis, out); err != nil {
 			return err
 		}
 	}
@@ -148,8 +176,8 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to generate collapsed stacks: %w", err)
 		}
-		fmt.Fprintln(os.Stdout, "\n--- Collapsed Stacks ---")
-		formatter := output.NewFlameFormatter(os.Stdout)
+		fmt.Fprintln(out, "\n--- Collapsed Stacks ---")
+		formatter := output.NewFlameFormatter(out)
 		return formatter.FormatFlameResult(flameResult)
 	}
 
@@ -157,19 +185,31 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 }
 
 // outputText outputs analysis in text format
-func outputText(analysis *profile.Analysis) error {
-	formatter := output.NewTextFormatter(os.Stdout)
+func outputText(analysis *profile.Analysis, w io.Writer) error {
+	formatter := output.NewTextFormatter(w)
 	return formatter.FormatAnalysis(analysis)
 }
 
 // outputJSON outputs analysis in JSON format
-func outputJSON(analysis *profile.Analysis) error {
-	formatter := output.NewJSONFormatter(os.Stdout)
+func outputJSON(analysis *profile.Analysis, w io.Writer) error {
+	formatter := output.NewJSONFormatter(w)
 	return formatter.FormatAnalysis(analysis)
 }
 
 // outputMarkdown outputs analysis in Markdown format
-func outputMarkdown(analysis *profile.Analysis) error {
-	formatter := output.NewMarkdownFormatter(os.Stdout)
+func outputMarkdown(analysis *profile.Analysis, w io.Writer) error {
+	formatter := output.NewMarkdownFormatter(w)
 	return formatter.FormatAnalysis(analysis)
+}
+
+// splitCSV splits a comma-separated string into trimmed, non-empty fields.
+func splitCSV(s string) []string {
+	var out []string
+	for part := range strings.SplitSeq(s, ",") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
 }

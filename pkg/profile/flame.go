@@ -45,7 +45,7 @@ type FlameConfig struct {
 }
 
 // Flame generates folded stack format from a profile
-func Flame(p *profile.Profile, config FlameConfig) (*FlameResult, error) {
+func Flame(p *Profile, config FlameConfig) (*FlameResult, error) {
 	if p == nil {
 		return nil, fmt.Errorf("profile is nil")
 	}

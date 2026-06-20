@@ -8,7 +8,7 @@ import (
 )
 
 // buildLargeProfile creates a profile with many samples for benchmarking
-func buildLargeProfile(b *testing.B) *pprofprofile.Profile {
+func buildLargeProfile(b *testing.B) *Profile {
 	const numFunctions = 100
 	const numSamples = 10000
 
@@ -45,7 +45,7 @@ func buildLargeProfile(b *testing.B) *pprofprofile.Profile {
 		}
 	}
 
-	return &pprofprofile.Profile{
+	return NewProfile(&pprofprofile.Profile{
 		PeriodType:    &pprofprofile.ValueType{Type: "cpu", Unit: "nanoseconds"},
 		Period:        10000000,
 		DurationNanos: 30e9,
@@ -54,7 +54,7 @@ func buildLargeProfile(b *testing.B) *pprofprofile.Profile {
 		Mapping:       []*pprofprofile.Mapping{m},
 		Location:      locs,
 		Sample:        samples,
-	}
+	})
 }
 
 func BenchmarkAnalysis(b *testing.B) {

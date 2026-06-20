@@ -2,7 +2,7 @@ package commands
 
 import (
 	"fmt"
-	"os"
+	"io"
 
 	"github.com/chenquan/agent-insight/pkg/output"
 	"github.com/chenquan/agent-insight/pkg/profile"
@@ -39,6 +39,8 @@ var (
 	diffTop         int
 	diffHideNew     bool
 	diffHideDeleted bool
+	diffTag         []string
+	diffIgnoreTag   []string
 )
 
 func init() {
@@ -50,6 +52,8 @@ func init() {
 	DiffCmd.Flags().IntVar(&diffTop, "top", 15, "Limit to top N in each category")
 	DiffCmd.Flags().BoolVar(&diffHideNew, "hide-new", false, "Hide new functions")
 	DiffCmd.Flags().BoolVar(&diffHideDeleted, "hide-deleted", false, "Hide deleted functions")
+	DiffCmd.Flags().StringSliceVar(&diffTag, "tag", nil, "Filter samples by pprof label key=value (repeatable; same key OR, across keys AND)")
+	DiffCmd.Flags().StringSliceVar(&diffIgnoreTag, "tag-ignore", nil, "Exclude samples by pprof label key=value (same semantics as --tag)")
 }
 
 func runDiff(cmd *cobra.Command, args []string) error {
@@ -83,6 +87,22 @@ func runDiff(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load target profile: %w", err)
 	}
 
+	// Apply pprof label filter (--tag / --tag-ignore) to both profiles before
+	// diffing. base is filtered first; if it matches 0 samples we error out
+	// before touching target.
+	labelFilter, err := profile.NewLabelFilter(diffTag, diffIgnoreTag)
+	if err != nil {
+		return err
+	}
+	base, err = labelFilter.Apply(base)
+	if err != nil {
+		return err
+	}
+	target, err = labelFilter.Apply(target)
+	if err != nil {
+		return err
+	}
+
 	// Configure diff
 	config := profile.DiffConfig{
 		MinDelta:      diffMinDelta,
@@ -106,30 +126,31 @@ func runDiff(cmd *cobra.Command, args []string) error {
 	}
 
 	// Generate output based on format
+	out := cmd.OutOrStdout()
 	switch diffFormat {
 	case "json":
-		return outputDiffJSON(result, basePath, targetPath)
+		return outputDiffJSON(result, basePath, targetPath, out)
 	case "markdown":
-		return outputDiffMarkdown(result, basePath, targetPath)
+		return outputDiffMarkdown(result, basePath, targetPath, out)
 	default:
-		return outputDiffText(result, basePath, targetPath)
+		return outputDiffText(result, basePath, targetPath, out)
 	}
 }
 
 // outputDiffText outputs diff result in text format
-func outputDiffText(result *profile.DiffResult, base, target string) error {
-	formatter := output.NewDiffTextFormatter(os.Stdout)
+func outputDiffText(result *profile.DiffResult, base, target string, w io.Writer) error {
+	formatter := output.NewDiffTextFormatter(w)
 	return formatter.FormatDiffResult(result, base, target)
 }
 
 // outputDiffJSON outputs diff result in JSON format
-func outputDiffJSON(result *profile.DiffResult, base, target string) error {
-	formatter := output.NewDiffJSONFormatter(os.Stdout)
+func outputDiffJSON(result *profile.DiffResult, base, target string, w io.Writer) error {
+	formatter := output.NewDiffJSONFormatter(w)
 	return formatter.FormatDiffResult(result, base, target)
 }
 
 // outputDiffMarkdown outputs diff result in Markdown format
-func outputDiffMarkdown(result *profile.DiffResult, base, target string) error {
-	formatter := output.NewDiffMarkdownFormatter(os.Stdout)
+func outputDiffMarkdown(result *profile.DiffResult, base, target string, w io.Writer) error {
+	formatter := output.NewDiffMarkdownFormatter(w)
 	return formatter.FormatDiffResult(result, base, target)
 }

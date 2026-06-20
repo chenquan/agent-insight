@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"sort"
 
-	"github.com/google/pprof/profile"
 )
 
 // TreeResult contains the result of a tree command.
@@ -36,7 +35,7 @@ type TreeConfig struct {
 }
 
 // Tree builds a hierarchical call tree from profile samples.
-func Tree(p *profile.Profile, config TreeConfig) (*TreeResult, error) {
+func Tree(p *Profile, config TreeConfig) (*TreeResult, error) {
 	if p == nil {
 		return nil, fmt.Errorf("profile is nil")
 	}

@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/google/pprof/profile"
 )
 
 // TracesResult contains the result of a traces query.
@@ -33,7 +32,7 @@ type TracesConfig struct {
 }
 
 // Traces iterates over samples and returns matching call chains.
-func Traces(p *profile.Profile, config TracesConfig) (*TracesResult, error) {
+func Traces(p *Profile, config TracesConfig) (*TracesResult, error) {
 	if p == nil {
 		return nil, fmt.Errorf("profile is nil")
 	}

@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/google/pprof/profile"
 )
 
 type language string
@@ -61,7 +60,7 @@ var filenamePatterns = map[language][]string{
 
 // DetectLanguage analyzes function names and filenames in the profile to detect
 // the programming language. Returns the language with the most matches.
-func DetectLanguage(p *profile.Profile) string {
+func DetectLanguage(p *Profile) string {
 	if p == nil || len(p.Function) == 0 {
 		return string(langUnknown)
 	}

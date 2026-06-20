@@ -2,7 +2,7 @@ package commands
 
 import (
 	"fmt"
-	"os"
+	"io"
 
 	"github.com/chenquan/agent-insight/pkg/output"
 	"github.com/chenquan/agent-insight/pkg/profile"
@@ -29,11 +29,13 @@ Example usage:
 
 // List flags
 var (
-	listDepth       int
-	listCallersOnly bool
-	listCalleesOnly bool
-	listExclude     string
-	listFormat      string
+	listDepth          int
+	listCallersOnly    bool
+	listCalleesOnly    bool
+	listIgnoreFunction string
+	listFormat         string
+	listTag            []string
+	listIgnoreTag      []string
 )
 
 func init() {
@@ -41,7 +43,9 @@ func init() {
 	ListCmd.Flags().IntVar(&listDepth, "depth", 5, "Maximum depth of caller/callee relationships to show")
 	ListCmd.Flags().BoolVar(&listCallersOnly, "callers-only", false, "Show only callers, exclude callees")
 	ListCmd.Flags().BoolVar(&listCalleesOnly, "callees-only", false, "Show only callees, exclude callers")
-	ListCmd.Flags().StringVar(&listExclude, "exclude", "", "Regex pattern to exclude from results")
+	ListCmd.Flags().StringVar(&listIgnoreFunction, "ignore-function", "", "Regex pattern to exclude matching functions")
+	ListCmd.Flags().StringSliceVar(&listTag, "tag", nil, "Filter samples by pprof label key=value (repeatable; same key OR, across keys AND)")
+	ListCmd.Flags().StringSliceVar(&listIgnoreTag, "tag-ignore", nil, "Exclude samples by pprof label key=value (same semantics as --tag)")
 	ListCmd.Flags().StringVar(&listFormat, "format", "text", "Output format: text, json, markdown")
 }
 
@@ -59,8 +63,8 @@ func runList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Validate exclude pattern
-	if err := ValidateRegex(listExclude, "exclude"); err != nil {
+	// Validate ignore-function pattern (function-name regex exclusion)
+	if err := ValidateRegex(listIgnoreFunction, "ignore-function"); err != nil {
 		return err
 	}
 
@@ -71,6 +75,16 @@ func runList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load profile: %w", err)
 	}
 
+	// Apply pprof label filter (--tag / --tag-ignore) before querying.
+	labelFilter, err := profile.NewLabelFilter(listTag, listIgnoreTag)
+	if err != nil {
+		return err
+	}
+	p, err = labelFilter.Apply(p)
+	if err != nil {
+		return err
+	}
+
 	// Configure list analysis
 	config := profile.ListConfig{
 		Pattern:     pattern,
@@ -79,8 +93,8 @@ func runList(cmd *cobra.Command, args []string) error {
 		CalleesOnly: listCalleesOnly,
 	}
 
-	if listExclude != "" {
-		config.ExcludePattern = listExclude
+	if listIgnoreFunction != "" {
+		config.ExcludePattern = listIgnoreFunction
 	}
 
 	// Perform list analysis
@@ -89,37 +103,39 @@ func runList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to query functions: %w", err)
 	}
 
+	out := cmd.OutOrStdout()
+
 	// Check if any functions matched
 	if len(result.MatchedFunctions) == 0 {
-		fmt.Printf("No functions matched pattern: %s\n", pattern)
+		fmt.Fprintf(out, "No functions matched pattern: %s\n", pattern)
 		return nil
 	}
 
 	// Generate output based on format
 	switch listFormat {
 	case "json":
-		return outputListJSON(result)
+		return outputListJSON(result, out)
 	case "markdown":
-		return outputListMarkdown(result)
+		return outputListMarkdown(result, out)
 	default:
-		return outputListText(result)
+		return outputListText(result, out)
 	}
 }
 
 // outputListText outputs list result in text format
-func outputListText(result *profile.ListResult) error {
-	formatter := output.NewListTextFormatter(os.Stdout)
+func outputListText(result *profile.ListResult, w io.Writer) error {
+	formatter := output.NewListTextFormatter(w)
 	return formatter.FormatListResult(result)
 }
 
 // outputListJSON outputs list result in JSON format
-func outputListJSON(result *profile.ListResult) error {
-	formatter := output.NewListJSONFormatter(os.Stdout)
+func outputListJSON(result *profile.ListResult, w io.Writer) error {
+	formatter := output.NewListJSONFormatter(w)
 	return formatter.FormatListResult(result)
 }
 
 // outputListMarkdown outputs list result in Markdown format
-func outputListMarkdown(result *profile.ListResult) error {
-	formatter := output.NewListMarkdownFormatter(os.Stdout)
+func outputListMarkdown(result *profile.ListResult, w io.Writer) error {
+	formatter := output.NewListMarkdownFormatter(w)
 	return formatter.FormatListResult(result)
 }

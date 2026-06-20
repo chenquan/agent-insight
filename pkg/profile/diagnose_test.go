@@ -112,7 +112,7 @@ func TestDiagnosePrompt_TextNoContext(t *testing.T) {
 	}
 }
 
-func makeTestCPUProfile() *pprofprofile.Profile {
+func makeTestCPUProfile() *Profile {
 	mallocgc := &pprofprofile.Function{ID: 1, Name: "runtime.mallocgc", SystemName: "runtime.mallocgc", Filename: "runtime/malloc.go"}
 	mainFunc := &pprofprofile.Function{ID: 2, Name: "main.main", SystemName: "main.main", Filename: "main.go"}
 	handleReq := &pprofprofile.Function{ID: 3, Name: "main.handleRequest", SystemName: "main.handleRequest", Filename: "main.go"}
@@ -125,7 +125,7 @@ func makeTestCPUProfile() *pprofprofile.Profile {
 	locHandleReq := &pprofprofile.Location{ID: 3, Mapping: mapping, Address: 0x1300, Line: []pprofprofile.Line{{Function: handleReq, Line: 42}}}
 	locJsonMarshal := &pprofprofile.Location{ID: 4, Mapping: mapping, Address: 0x1400, Line: []pprofprofile.Line{{Function: jsonMarshal, Line: 160}}}
 
-	return &pprofprofile.Profile{
+	return NewProfile(&pprofprofile.Profile{
 		PeriodType:   &pprofprofile.ValueType{Type: "cpu", Unit: "nanoseconds"},
 		Period:       10000000,
 		DurationNanos: 30e9,
@@ -140,5 +140,5 @@ func makeTestCPUProfile() *pprofprofile.Profile {
 			{Location: []*pprofprofile.Location{locMallocgc, locHandleReq, locMain}, Value: []int64{500, 5000000000}},
 			{Location: []*pprofprofile.Location{locJsonMarshal, locHandleReq, locMain}, Value: []int64{300, 3000000000}},
 		},
-	}
+	})
 }

@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"sort"
 
-	"github.com/google/pprof/profile"
 )
 
 // DiffResult represents the result of comparing two profiles
@@ -77,12 +76,12 @@ type DiffConfig struct {
 }
 
 // Diff compares two profiles and identifies performance changes
-func Diff(base, target *profile.Profile, config DiffConfig) (*DiffResult, error) {
+func Diff(base, target *Profile, config DiffConfig) (*DiffResult, error) {
 	if base == nil || target == nil {
 		return nil, fmt.Errorf("both profiles must be non-nil")
 	}
 
-	if err := ValidateTypeConsistency([]*profile.Profile{base, target}); err != nil {
+	if err := ValidateTypeConsistency([]*Profile{base, target}); err != nil {
 		return nil, err
 	}
 
@@ -169,7 +168,7 @@ func Diff(base, target *profile.Profile, config DiffConfig) (*DiffResult, error)
 }
 
 // calculateDeltas calculates deltas for all functions between two profiles
-func calculateDeltas(base, target *profile.Profile, valueIndex int) []FunctionDelta {
+func calculateDeltas(base, target *Profile, valueIndex int) []FunctionDelta {
 	// Build maps of location ID -> function info and values
 	baseValues := buildLocationValueMap(base, valueIndex)
 	targetValues := buildLocationValueMap(target, valueIndex)
@@ -245,7 +244,7 @@ type locationValue struct {
 }
 
 // buildLocationValueMap builds a map of location ID to value data
-func buildLocationValueMap(p *profile.Profile, valueIndex int) map[uint64]locationValue {
+func buildLocationValueMap(p *Profile, valueIndex int) map[uint64]locationValue {
 	valueMap := make(map[uint64]locationValue)
 
 	for _, sample := range p.Sample {
@@ -277,7 +276,7 @@ func buildLocationValueMap(p *profile.Profile, valueIndex int) map[uint64]locati
 }
 
 // extractDeltaSymbolInfo extracts symbol information for a delta
-func extractDeltaSymbolInfo(p *profile.Profile, locID uint64, delta *FunctionDelta) {
+func extractDeltaSymbolInfo(p *Profile, locID uint64, delta *FunctionDelta) {
 	loc := findLocationByID(p, locID)
 	if loc == nil {
 		return
@@ -342,7 +341,7 @@ func filterByMinDelta(deltas []FunctionDelta, minDelta float64) []FunctionDelta 
 }
 
 // calculateOverallDiff calculates overall statistics
-func calculateOverallDiff(base, target *profile.Profile, valueIndex int) OverallDiff {
+func calculateOverallDiff(base, target *Profile, valueIndex int) OverallDiff {
 	baseTotal := int64(0)
 	targetTotal := int64(0)
 

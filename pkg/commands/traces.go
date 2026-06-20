@@ -2,7 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/chenquan/agent-insight/pkg/output"
 	"github.com/chenquan/agent-insight/pkg/profile"
@@ -15,6 +14,8 @@ var (
 	tracesIgnore    string
 	tracesTop       int
 	tracesFormat    string
+	tracesTag       []string
+	tracesIgnoreTag []string
 )
 
 var TracesCmd = &cobra.Command{
@@ -37,6 +38,8 @@ func init() {
 	TracesCmd.Flags().StringVar(&tracesFocus, "focus", "", "Regex pattern to focus on specific functions")
 	TracesCmd.Flags().StringVar(&tracesIgnore, "ignore", "", "Regex pattern to ignore specific functions")
 	TracesCmd.Flags().IntVar(&tracesTop, "top", 20, "Limit to top N traces")
+	TracesCmd.Flags().StringSliceVar(&tracesTag, "tag", nil, "Filter samples by pprof label key=value (repeatable; same key OR, across keys AND)")
+	TracesCmd.Flags().StringSliceVar(&tracesIgnoreTag, "tag-ignore", nil, "Exclude samples by pprof label key=value (same semantics as --tag)")
 	TracesCmd.Flags().StringVar(&tracesFormat, "format", "text", "Output format: text, json, markdown")
 }
 
@@ -61,6 +64,16 @@ func runTraces(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load profile: %w", err)
 	}
 
+	// Apply pprof label filter (--tag / --tag-ignore) before querying.
+	labelFilter, err := profile.NewLabelFilter(tracesTag, tracesIgnoreTag)
+	if err != nil {
+		return err
+	}
+	p, err = labelFilter.Apply(p)
+	if err != nil {
+		return err
+	}
+
 	config := profile.TracesConfig{
 		FocusPattern:  tracesFocus,
 		IgnorePattern: tracesIgnore,
@@ -72,15 +85,13 @@ func runTraces(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to query traces: %w", err)
 	}
 
+	out := cmd.OutOrStdout()
 	switch tracesFormat {
 	case "json":
-		formatter := output.NewTracesJSONFormatter(os.Stdout)
-		return formatter.FormatTracesResult(result)
+		return output.NewTracesJSONFormatter(out).FormatTracesResult(result)
 	case "markdown":
-		formatter := output.NewTracesMarkdownFormatter(os.Stdout)
-		return formatter.FormatTracesResult(result)
+		return output.NewTracesMarkdownFormatter(out).FormatTracesResult(result)
 	default:
-		formatter := output.NewTracesTextFormatter(os.Stdout)
-		return formatter.FormatTracesResult(result)
+		return output.NewTracesTextFormatter(out).FormatTracesResult(result)
 	}
 }

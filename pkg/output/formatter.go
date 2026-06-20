@@ -80,6 +80,11 @@ func (f *TextFormatter) FormatAnalysis(analysis *profile.Analysis) error {
 		// Output metrics
 		fmt.Fprintf(f.writer, "   Flat:      %d (%.2f%%)\n", hotspot.FlatValue, hotspot.FlatPercent)
 		fmt.Fprintf(f.writer, "   Cumulative: %d (%.2f%%)\n", hotspot.CumValue, hotspot.CumPercent)
+
+		// Output label breakdown if present
+		if i < len(analysis.LabelBreakdowns) {
+			formatLabelBreakdownText(f.writer, analysis.LabelBreakdowns[i])
+		}
 	}
 
 	// Output call paths if available
@@ -125,16 +130,31 @@ type JSONOutput struct {
 
 // JSONHotspot represents a hotspot in JSON format
 type JSONHotspot struct {
-	Function    *string `json:"function,omitempty"`
-	File        *string `json:"file,omitempty"`
-	LocationID  *uint64 `json:"location_id,omitempty"`
-	Address     *string `json:"address,omitempty"`
-	Module      *string `json:"module,omitempty"`
-	Unit        string  `json:"unit"`
-	Flat        int64   `json:"flat"`
-	FlatPercent float64 `json:"flat_percent"`
-	Cum         int64   `json:"cum"`
-	CumPercent  float64 `json:"cum_percent"`
+	Function      *string             `json:"function,omitempty"`
+	File          *string             `json:"file,omitempty"`
+	LocationID    *uint64             `json:"location_id,omitempty"`
+	Address       *string             `json:"address,omitempty"`
+	Module        *string             `json:"module,omitempty"`
+	Unit          string              `json:"unit"`
+	Flat          int64               `json:"flat"`
+	FlatPercent   float64             `json:"flat_percent"`
+	Cum           int64               `json:"cum"`
+	CumPercent    float64             `json:"cum_percent"`
+	LabelBreakdown []jsonLabelBreakdown `json:"label_breakdown,omitempty"`
+}
+
+// jsonLabelBreakdown is the per-key breakdown attached to a hotspot.
+type jsonLabelBreakdown struct {
+	Key    string                   `json:"key"`
+	Values []jsonLabelContribution  `json:"values"`
+}
+
+type jsonLabelContribution struct {
+	Value   string  `json:"value"`
+	Flat    int64   `json:"flat"`
+	FlatPct float64 `json:"flat_pct"`
+	Cum     int64   `json:"cum"`
+	CumPct  float64 `json:"cum_pct"`
 }
 
 func (f *JSONFormatter) convertToJSONFormat(analysis *profile.Analysis) *JSONOutput {
@@ -165,7 +185,7 @@ func (f *JSONFormatter) convertToJSONFormat(analysis *profile.Analysis) *JSONOut
 		unit = analysis.Config.ValueType.Unit
 	}
 	for i, hotspot := range analysis.Hotspots {
-		output.Top[i] = JSONHotspot{
+		jh := JSONHotspot{
 			Function:    hotspot.Function,
 			File:        hotspot.File,
 			LocationID:  hotspot.LocationID,
@@ -177,12 +197,60 @@ func (f *JSONFormatter) convertToJSONFormat(analysis *profile.Analysis) *JSONOut
 			Cum:         hotspot.CumValue,
 			CumPercent:  roundPercent(hotspot.CumPercent),
 		}
+		// Attach label breakdown if this hotspot has a corresponding entry.
+		if i < len(analysis.LabelBreakdowns) {
+			jh.LabelBreakdown = convertFunctionBreakdown(analysis.LabelBreakdowns[i])
+		}
+		output.Top[i] = jh
 	}
 
 	// Generate summary
 	output.Summary = generateSummary(analysis)
 
 	return output
+}
+
+// formatLabelBreakdownText writes a per-function label breakdown in indented text.
+func formatLabelBreakdownText(w io.Writer, fb profile.FunctionLabelBreakdown) {
+	for _, lb := range fb.Labels {
+		if len(lb.Values) == 0 {
+			continue
+		}
+		fmt.Fprintf(w, "   %s:\n", lb.Key)
+		for _, v := range lb.Values {
+			fmt.Fprintf(w, "      %-14s flat: %d (%.2f%%)  cum: %d (%.2f%%)\n",
+				v.Value, v.Flat, v.FlatPct, v.Cum, v.CumPct)
+		}
+	}
+}
+
+// convertFunctionBreakdown renders a FunctionLabelBreakdown as JSON-friendly
+// entries, dropping label keys that have no values so the output stays clean.
+func convertFunctionBreakdown(fb profile.FunctionLabelBreakdown) []jsonLabelBreakdown {
+	if len(fb.Labels) == 0 {
+		return nil
+	}
+	out := make([]jsonLabelBreakdown, 0, len(fb.Labels))
+	for _, lb := range fb.Labels {
+		if len(lb.Values) == 0 {
+			continue
+		}
+		values := make([]jsonLabelContribution, len(lb.Values))
+		for j, v := range lb.Values {
+			values[j] = jsonLabelContribution{
+				Value:   v.Value,
+				Flat:    v.Flat,
+				FlatPct: roundPercent(v.FlatPct),
+				Cum:     v.Cum,
+				CumPct:  roundPercent(v.CumPct),
+			}
+		}
+		out = append(out, jsonLabelBreakdown{Key: lb.Key, Values: values})
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // MarkdownFormatter outputs analysis in Markdown format
@@ -231,6 +299,38 @@ func (f *MarkdownFormatter) FormatAnalysis(analysis *profile.Analysis) error {
 			i+1, function, file,
 			hotspot.FlatValue, hotspot.FlatPercent,
 			hotspot.CumValue, hotspot.CumPercent)
+	}
+
+	// Output label breakdowns if present
+	for i := range analysis.Hotspots {
+		if i >= len(analysis.LabelBreakdowns) {
+			break
+		}
+		fb := analysis.LabelBreakdowns[i]
+		hasValues := false
+		for _, lb := range fb.Labels {
+			if len(lb.Values) > 0 {
+				hasValues = true
+				break
+			}
+		}
+		if !hasValues {
+			continue
+		}
+		fmt.Fprintf(f.writer, "\n### Label Breakdown — %s\n\n", formatFunctionRef(&fb.Function))
+		for _, lb := range fb.Labels {
+			if len(lb.Values) == 0 {
+				continue
+			}
+			fmt.Fprintf(f.writer, "**`%s`**\n\n", lb.Key)
+			fmt.Fprintf(f.writer, "| Value | Flat | Flat%% | Cum | Cum%% |\n")
+			fmt.Fprintf(f.writer, "|-------|------|-------|-----|------|\n")
+			for _, v := range lb.Values {
+				fmt.Fprintf(f.writer, "| `%s` | %d | %.2f%% | %d | %.2f%% |\n",
+					v.Value, v.Flat, v.FlatPct, v.Cum, v.CumPct)
+			}
+			fmt.Fprintf(f.writer, "\n")
+		}
 	}
 
 	// Output summary
@@ -596,6 +696,8 @@ func (f *InfoTextFormatter) FormatInfoResult(result *profile.InfoResult) error {
 	}
 	fmt.Fprintf(f.writer, "\n")
 
+	fmt.Fprintf(f.writer, "Labels: %d keys, %d unique values\n", result.LabelSummary.KeyCount, result.LabelSummary.DistinctValues)
+
 	if result.TimeRange.HasTime {
 		fmt.Fprintf(f.writer, "\nTime Range:\n")
 		fmt.Fprintf(f.writer, "  Start: %s\n", result.TimeRange.Start.Format("2006-01-02 15:04:05"))
@@ -660,6 +762,10 @@ func (f *InfoJSONFormatter) FormatInfoResult(result *profile.InfoResult) error {
 		"has_symbols":    result.HasSymbols,
 		"has_file_lines": result.HasFileLines,
 		"value_types":    result.ValueTypes,
+		"label_summary": map[string]interface{}{
+			"key_count":       result.LabelSummary.KeyCount,
+			"distinct_values": result.LabelSummary.DistinctValues,
+		},
 	}
 
 	if result.TimeRange.HasTime {
@@ -715,6 +821,7 @@ func (f *InfoMarkdownFormatter) FormatInfoResult(result *profile.InfoResult) err
 	fmt.Fprintf(f.writer, "| Locations | %d |\n", result.Locations)
 	fmt.Fprintf(f.writer, "| Symbols | %v |\n", result.HasSymbols)
 	fmt.Fprintf(f.writer, "| File/Lines | %v |\n", result.HasFileLines)
+	fmt.Fprintf(f.writer, "| Labels | %d keys, %d unique values |\n", result.LabelSummary.KeyCount, result.LabelSummary.DistinctValues)
 
 	if len(result.ValueTypes) > 0 {
 		fmt.Fprintf(f.writer, "\n## Value Types\n\n")
@@ -1756,4 +1863,149 @@ func convertDiagnoseHotspots(hotspots []profile.Hotspot) []map[string]interface{
 		result[i] = entry
 	}
 	return result
+}
+
+// TagsTextFormatter formats tags results in text format.
+type TagsTextFormatter struct {
+	writer io.Writer
+}
+
+func NewTagsTextFormatter(w io.Writer) *TagsTextFormatter {
+	return &TagsTextFormatter{writer: w}
+}
+
+func (f *TagsTextFormatter) FormatTagsResult(result *profile.TagsResult) error {
+	fmt.Fprintf(f.writer, "Profile: %s\n", result.ProfilePath)
+	fmt.Fprintf(f.writer, "Type: %s\n", result.Type)
+	fmt.Fprintf(f.writer, "Total samples: %d\n\n", result.TotalSamples)
+
+	if len(result.Labels) == 0 {
+		fmt.Fprintf(f.writer, "no labels found\n")
+		return nil
+	}
+
+	totalDistinct := 0
+	for _, ls := range result.Labels {
+		totalDistinct += ls.Distinct
+	}
+	fmt.Fprintf(f.writer, "Labels (%d keys, %d unique values):\n\n", len(result.Labels), totalDistinct)
+
+	for _, ls := range result.Labels {
+		f.formatLabelSummary(ls)
+		fmt.Fprintf(f.writer, "\n")
+	}
+	return nil
+}
+
+func (f *TagsTextFormatter) formatLabelSummary(ls profile.LabelSummary) {
+	switch ls.Type {
+	case "numeric":
+		if ls.Unit != nil {
+			fmt.Fprintf(f.writer, "  %s (numeric, %s, %d unique values)\n", ls.Key, *ls.Unit, ls.Distinct)
+		} else {
+			fmt.Fprintf(f.writer, "  %s (numeric, %d unique values)\n", ls.Key, ls.Distinct)
+		}
+	default:
+		fmt.Fprintf(f.writer, "  %s (string, %d values)\n", ls.Key, ls.Distinct)
+	}
+
+	if len(ls.Values) < ls.Distinct {
+		fmt.Fprintf(f.writer, "    [showing top %d of %d]\n", len(ls.Values), ls.Distinct)
+	}
+	for _, v := range ls.Values {
+		fmt.Fprintf(f.writer, "    %-18s %8d  %6.2f%%\n", v.Value, v.Count, v.Percent)
+	}
+}
+
+// TagsJSONFormatter formats tags results in JSON format.
+type TagsJSONFormatter struct {
+	writer io.Writer
+}
+
+func NewTagsJSONFormatter(w io.Writer) *TagsJSONFormatter {
+	return &TagsJSONFormatter{writer: w}
+}
+
+func (f *TagsJSONFormatter) FormatTagsResult(result *profile.TagsResult) error {
+	output := map[string]interface{}{
+		"profile_path":  result.ProfilePath,
+		"type":          result.Type,
+		"total_samples": result.TotalSamples,
+		"labels":        convertLabelSummaries(result.Labels),
+	}
+
+	encoder := json.NewEncoder(f.writer)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(output)
+}
+
+// convertLabelSummaries renders []LabelSummary as JSON-friendly maps.
+func convertLabelSummaries(summaries []profile.LabelSummary) []map[string]interface{} {
+	out := make([]map[string]interface{}, len(summaries))
+	for i, ls := range summaries {
+		entry := map[string]interface{}{
+			"key":      ls.Key,
+			"type":     ls.Type,
+			"unit":     ls.Unit,
+			"distinct": ls.Distinct,
+		}
+		values := make([]map[string]interface{}, len(ls.Values))
+		for j, v := range ls.Values {
+			values[j] = map[string]interface{}{
+				"value":   v.Value,
+				"count":   v.Count,
+				"percent": roundPercent(v.Percent),
+			}
+		}
+		entry["values"] = values
+		entry["values_truncated"] = len(ls.Values) < ls.Distinct
+		out[i] = entry
+	}
+	return out
+}
+
+// TagsMarkdownFormatter formats tags results in Markdown format.
+type TagsMarkdownFormatter struct {
+	writer io.Writer
+}
+
+func NewTagsMarkdownFormatter(w io.Writer) *TagsMarkdownFormatter {
+	return &TagsMarkdownFormatter{writer: w}
+}
+
+func (f *TagsMarkdownFormatter) FormatTagsResult(result *profile.TagsResult) error {
+	fmt.Fprintf(f.writer, "# pprof Labels\n\n")
+	fmt.Fprintf(f.writer, "| Property | Value |\n|----------|-------|\n")
+	fmt.Fprintf(f.writer, "| Profile | `%s` |\n", result.ProfilePath)
+	fmt.Fprintf(f.writer, "| Type | %s |\n", result.Type)
+	fmt.Fprintf(f.writer, "| Total samples | %d |\n\n", result.TotalSamples)
+
+	if len(result.Labels) == 0 {
+		fmt.Fprintf(f.writer, "_no labels found_\n")
+		return nil
+	}
+
+	for _, ls := range result.Labels {
+		switch ls.Type {
+		case "numeric":
+			if ls.Unit != nil {
+				fmt.Fprintf(f.writer, "## `%s` (numeric, %s, %d unique values)\n\n", ls.Key, *ls.Unit, ls.Distinct)
+			} else {
+				fmt.Fprintf(f.writer, "## `%s` (numeric, %d unique values)\n\n", ls.Key, ls.Distinct)
+			}
+		default:
+			fmt.Fprintf(f.writer, "## `%s` (string, %d values)\n\n", ls.Key, ls.Distinct)
+		}
+
+		if len(ls.Values) < ls.Distinct {
+			fmt.Fprintf(f.writer, "_showing top %d of %d_\n\n", len(ls.Values), ls.Distinct)
+		}
+
+		fmt.Fprintf(f.writer, "| Value | Count | Percent |\n|-------|-------|---------|\n")
+		for _, v := range ls.Values {
+			fmt.Fprintf(f.writer, "| `%s` | %d | %.2f%% |\n", v.Value, v.Count, v.Percent)
+		}
+		fmt.Fprintf(f.writer, "\n")
+	}
+	return nil
 }

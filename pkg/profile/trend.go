@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"sort"
 
-	"github.com/google/pprof/profile"
 )
 
 // TimePoint represents a single data point in the time series.
@@ -74,7 +73,7 @@ type TrendConfig struct {
 }
 
 // Trend analyzes multiple profiles to detect performance trends.
-func Trend(profiles []*profile.Profile, timePoints []TimePoint, config TrendConfig) (*TrendResult, error) {
+func Trend(profiles []*Profile, timePoints []TimePoint, config TrendConfig) (*TrendResult, error) {
 	if len(profiles) < 3 {
 		return nil, fmt.Errorf("need at least 3 profiles for trend analysis, got %d (use 'diff' for 2 profiles)", len(profiles))
 	}
@@ -367,7 +366,7 @@ type locationSymbol struct {
 	Module     *string
 }
 
-func extractLocationSymbol(p *profile.Profile, locID uint64) *locationSymbol {
+func extractLocationSymbol(p *Profile, locID uint64) *locationSymbol {
 	loc := findLocationByID(p, locID)
 	if loc == nil {
 		return nil
@@ -406,7 +405,7 @@ func matchFunction(ft FunctionTrend, focusRegex, ignoreRegex *regexp.Regexp) boo
 	return true
 }
 
-func getFunctionNameFromProfile(p *profile.Profile, locID uint64) string {
+func getFunctionNameFromProfile(p *Profile, locID uint64) string {
 	loc := findLocationByID(p, locID)
 	if loc == nil {
 		return fmt.Sprintf("0x%x", locID)
@@ -414,7 +413,7 @@ func getFunctionNameFromProfile(p *profile.Profile, locID uint64) string {
 	return getFunctionNameFromLocation(loc)
 }
 
-func findFirstLocationID(p *profile.Profile, funcName string) uint64 {
+func findFirstLocationID(p *Profile, funcName string) uint64 {
 	for _, loc := range p.Location {
 		name := getFunctionNameFromLocation(loc)
 		if name == funcName {

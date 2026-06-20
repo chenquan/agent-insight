@@ -20,6 +20,7 @@ Analyzes pprof performance profiles and outputs structured, AI-friendly results.
 
 Core commands:
   analyze  - Analyze pprof files and output performance hotspots
+  tags     - List pprof labels and their value distribution
   diagnose - Generate AI diagnostic prompt from pprof profile
   list     - Query specific function call relationships
   flame    - Generate folded stack format for flame graphs
@@ -50,6 +51,7 @@ func init() {
 	rootCmd.AddCommand(commands.InfoCmd)
 	rootCmd.AddCommand(commands.TracesCmd)
 	rootCmd.AddCommand(commands.TreeCmd)
+	rootCmd.AddCommand(commands.TagsCmd)
 	rootCmd.AddCommand(commands.MergeCmd)
 	rootCmd.AddCommand(commands.TrendCmd)
 	rootCmd.AddCommand(commands.InitCmd)

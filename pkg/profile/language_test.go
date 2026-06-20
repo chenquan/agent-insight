@@ -14,7 +14,7 @@ func TestDetectLanguage_Go(t *testing.T) {
 			{Name: "encoding/json.Marshal", Filename: "encoding/json/encode.go"},
 		},
 	}
-	got := DetectLanguage(p)
+	got := DetectLanguage(NewProfile(p))
 	if got != string(langGo) {
 		t.Errorf("DetectLanguage() = %q, want %q", got, langGo)
 	}
@@ -28,7 +28,7 @@ func TestDetectLanguage_CPP(t *testing.T) {
 			{Name: "llvm::IRBuilder", Filename: "ir/irbuilder.cpp"},
 		},
 	}
-	got := DetectLanguage(p)
+	got := DetectLanguage(NewProfile(p))
 	if got != string(langCPP) {
 		t.Errorf("DetectLanguage() = %q, want %q", got, langCPP)
 	}
@@ -42,7 +42,7 @@ func TestDetectLanguage_Rust(t *testing.T) {
 			{Name: "<T as std::fmt::Display>::fmt", Filename: "lib.rs"},
 		},
 	}
-	got := DetectLanguage(p)
+	got := DetectLanguage(NewProfile(p))
 	if got != string(langRust) {
 		t.Errorf("DetectLanguage() = %q, want %q", got, langRust)
 	}
@@ -56,7 +56,7 @@ func TestDetectLanguage_Java(t *testing.T) {
 			{Name: "org.apache.http.client.execute", Filename: "HttpClient.java"},
 		},
 	}
-	got := DetectLanguage(p)
+	got := DetectLanguage(NewProfile(p))
 	if got != string(langJava) {
 		t.Errorf("DetectLanguage() = %q, want %q", got, langJava)
 	}
@@ -70,7 +70,7 @@ func TestDetectLanguage_C(t *testing.T) {
 			{Name: "handle_request", Filename: "main.c"},
 		},
 	}
-	got := DetectLanguage(p)
+	got := DetectLanguage(NewProfile(p))
 	if got != string(langC) {
 		t.Errorf("DetectLanguage() = %q, want %q", got, langC)
 	}
@@ -90,7 +90,7 @@ func TestDetectLanguage_Unknown(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := DetectLanguage(tt.p)
+			got := DetectLanguage(NewProfile(tt.p))
 			if got != string(langUnknown) {
 				t.Errorf("DetectLanguage() = %q, want %q", got, langUnknown)
 			}
@@ -106,7 +106,7 @@ func TestDetectLanguage_Mixed_GoWins(t *testing.T) {
 			{Name: "encoding/json.Marshal", Filename: "encoding/json/encode.go"},
 		},
 	}
-	got := DetectLanguage(p)
+	got := DetectLanguage(NewProfile(p))
 	if got != string(langGo) {
 		t.Errorf("DetectLanguage() = %q, want %q (Go should win with more matches)", got, langGo)
 	}

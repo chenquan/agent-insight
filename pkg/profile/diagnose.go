@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/pprof/profile"
 )
 
 // DiagnosePrompt holds all components of a diagnostic prompt.
@@ -104,7 +103,7 @@ var languageAddition = map[string]string{
 }
 
 // BuildDiagnosePrompt constructs a diagnostic prompt from profile data.
-func BuildDiagnosePrompt(p *profile.Profile, topN int, userContext string) (*DiagnosePrompt, error) {
+func BuildDiagnosePrompt(p *Profile, topN int, userContext string) (*DiagnosePrompt, error) {
 	metadata := extractMetadata(p)
 	lang := DetectLanguage(p)
 

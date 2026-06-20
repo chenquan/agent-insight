@@ -24,7 +24,7 @@ func NewLoader() *Loader {
 
 // LoadFromFile loads a profile from a file path
 // Supports both .pb.gz (gzipped protobuf) and .pb (raw protobuf) formats
-func (l *Loader) LoadFromFile(path string) (*profile.Profile, error) {
+func (l *Loader) LoadFromFile(path string) (*Profile, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open profile file: %w", err)
@@ -36,7 +36,7 @@ func (l *Loader) LoadFromFile(path string) (*profile.Profile, error) {
 
 // ParseFromReader parses a profile from an io.Reader
 // The filename is used to determine if gzip decompression should be applied
-func (l *Loader) ParseFromReader(r io.Reader, filename string) (*profile.Profile, error) {
+func (l *Loader) ParseFromReader(r io.Reader, filename string) (*Profile, error) {
 	var reader = r
 
 	// Check if the file is gzipped by extension
@@ -55,7 +55,7 @@ func (l *Loader) ParseFromReader(r io.Reader, filename string) (*profile.Profile
 		return nil, fmt.Errorf("failed to parse profile: %w", err)
 	}
 
-	return p, nil
+	return NewProfile(p), nil
 }
 
 // DiscoverProfiles recursively finds .pb and .pb.gz files in a directory.

@@ -7,7 +7,7 @@ import (
 )
 
 func TestInferProfileType_HeapFromNilPeriodType(t *testing.T) {
-	p := &pprofprofile.Profile{
+	p := NewProfile(&pprofprofile.Profile{
 		PeriodType: nil,
 		SampleType: []*pprofprofile.ValueType{
 			{Type: "alloc_objects", Unit: "count"},
@@ -15,7 +15,7 @@ func TestInferProfileType_HeapFromNilPeriodType(t *testing.T) {
 			{Type: "inuse_objects", Unit: "count"},
 			{Type: "inuse_space", Unit: "bytes"},
 		},
-	}
+	})
 
 	analysis, err := NewAnalysis(p, AnalysisConfig{TopN: 5, CallDepth: 0})
 	if err != nil {
@@ -27,13 +27,13 @@ func TestInferProfileType_HeapFromNilPeriodType(t *testing.T) {
 }
 
 func TestInferProfileType_CPU(t *testing.T) {
-	p := &pprofprofile.Profile{
+	p := NewProfile(&pprofprofile.Profile{
 		PeriodType: nil,
 		SampleType: []*pprofprofile.ValueType{
 			{Type: "samples", Unit: "count"},
 			{Type: "cpu", Unit: "nanoseconds"},
 		},
-	}
+	})
 
 	got := inferProfileType(p)
 	if got != "cpu" {
@@ -42,12 +42,12 @@ func TestInferProfileType_CPU(t *testing.T) {
 }
 
 func TestInferProfileType_Unknown(t *testing.T) {
-	p := &pprofprofile.Profile{
+	p := NewProfile(&pprofprofile.Profile{
 		PeriodType: nil,
 		SampleType: []*pprofprofile.ValueType{
 			{Type: "custom_metric", Unit: "widgets"},
 		},
-	}
+	})
 
 	got := inferProfileType(p)
 	if got != "unknown" {
@@ -56,12 +56,12 @@ func TestInferProfileType_Unknown(t *testing.T) {
 }
 
 func TestInferProfileType_PeriodTypeWinsOverInference(t *testing.T) {
-	p := &pprofprofile.Profile{
+	p := NewProfile(&pprofprofile.Profile{
 		PeriodType: &pprofprofile.ValueType{Type: "cpu", Unit: "nanoseconds"},
 		SampleType: []*pprofprofile.ValueType{
 			{Type: "inuse_space", Unit: "bytes"},
 		},
-	}
+	})
 
 	analysis, err := NewAnalysis(p, AnalysisConfig{TopN: 5, CallDepth: 0})
 	if err != nil {

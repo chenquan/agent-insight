@@ -12,7 +12,7 @@ func TestMergeTwoProfiles(t *testing.T) {
 	p1 := buildCPUProfile(t, 2, 100)
 	p2 := buildCPUProfile(t, 3, 200)
 
-	merged, result, err := ValidateAndMerge([]*pprofprofile.Profile{p1, p2})
+	merged, result, err := ValidateAndMerge([]*Profile{p1, p2})
 	if err != nil {
 		t.Fatalf("ValidateAndMerge failed: %v", err)
 	}
@@ -44,7 +44,7 @@ func TestMergeProfilesWithDifferentStacks(t *testing.T) {
 	p1 := buildCPUProfileWithFunc(t, 2, 100, "funcA")
 	p2 := buildCPUProfileWithFunc(t, 3, 200, "funcB")
 
-	merged, result, err := ValidateAndMerge([]*pprofprofile.Profile{p1, p2})
+	merged, result, err := ValidateAndMerge([]*Profile{p1, p2})
 	if err != nil {
 		t.Fatalf("ValidateAndMerge failed: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestMergeProfilesWithDifferentStacks(t *testing.T) {
 func TestMergeSingleProfile(t *testing.T) {
 	p := buildCPUProfile(t, 2, 100)
 
-	_, _, err := ValidateAndMerge([]*pprofprofile.Profile{p})
+	_, _, err := ValidateAndMerge([]*Profile{p})
 	if err == nil {
 		t.Fatal("expected error for single profile")
 	}
@@ -72,7 +72,7 @@ func TestMergeMixedTypes(t *testing.T) {
 	cpu := buildCPUProfile(t, 2, 100)
 	heap := buildHeapProfile(t, 2)
 
-	_, _, err := ValidateAndMerge([]*pprofprofile.Profile{cpu, heap})
+	_, _, err := ValidateAndMerge([]*Profile{cpu, heap})
 	if err == nil {
 		t.Fatal("expected error for mixed types")
 	}
@@ -83,7 +83,7 @@ func TestMergeOutputReadable(t *testing.T) {
 	p1 := buildCPUProfile(t, 3, 100)
 	p2 := buildCPUProfile(t, 2, 200)
 
-	merged, _, err := ValidateAndMerge([]*pprofprofile.Profile{p1, p2})
+	merged, _, err := ValidateAndMerge([]*Profile{p1, p2})
 	if err != nil {
 		t.Fatalf("ValidateAndMerge failed: %v", err)
 	}
@@ -124,7 +124,7 @@ func TestMergeThreeProfiles(t *testing.T) {
 	p2 := buildCPUProfileWithFunc(t, 1, 200, "funcB")
 	p3 := buildCPUProfileWithFunc(t, 1, 300, "funcC")
 
-	merged, result, err := ValidateAndMerge([]*pprofprofile.Profile{p1, p2, p3})
+	merged, result, err := ValidateAndMerge([]*Profile{p1, p2, p3})
 	if err != nil {
 		t.Fatalf("ValidateAndMerge failed: %v", err)
 	}
@@ -137,12 +137,12 @@ func TestMergeThreeProfiles(t *testing.T) {
 	}
 }
 
-func buildCPUProfile(t *testing.T, numSamples int, value int64) *pprofprofile.Profile {
+func buildCPUProfile(t *testing.T, numSamples int, value int64) *Profile {
 	t.Helper()
 	return buildCPUProfileWithFunc(t, numSamples, value, "main.work")
 }
 
-func buildCPUProfileWithFunc(t *testing.T, numSamples int, value int64, funcName string) *pprofprofile.Profile {
+func buildCPUProfileWithFunc(t *testing.T, numSamples int, value int64, funcName string) *Profile {
 	t.Helper()
 
 	fn := &pprofprofile.Function{ID: 1, Name: funcName, Filename: "main.go"}
@@ -156,17 +156,17 @@ func buildCPUProfileWithFunc(t *testing.T, numSamples int, value int64, funcName
 		})
 	}
 
-	return &pprofprofile.Profile{
+	return NewProfile(&pprofprofile.Profile{
 		PeriodType: &pprofprofile.ValueType{Type: "cpu", Unit: "nanoseconds"},
 		Period:     10000000,
 		SampleType: []*pprofprofile.ValueType{{Type: "samples", Unit: "count"}},
 		Function:   []*pprofprofile.Function{fn},
 		Location:   []*pprofprofile.Location{loc},
 		Sample:     samples,
-	}
+	})
 }
 
-func buildHeapProfile(t *testing.T, numSamples int) *pprofprofile.Profile {
+func buildHeapProfile(t *testing.T, numSamples int) *Profile {
 	t.Helper()
 
 	fn := &pprofprofile.Function{ID: 1, Name: "main.alloc", Filename: "main.go"}
@@ -180,7 +180,7 @@ func buildHeapProfile(t *testing.T, numSamples int) *pprofprofile.Profile {
 		})
 	}
 
-	return &pprofprofile.Profile{
+	return NewProfile(&pprofprofile.Profile{
 		PeriodType: &pprofprofile.ValueType{Type: "space", Unit: "bytes"},
 		Period:     512,
 		SampleType: []*pprofprofile.ValueType{
@@ -190,5 +190,5 @@ func buildHeapProfile(t *testing.T, numSamples int) *pprofprofile.Profile {
 		Function: []*pprofprofile.Function{fn},
 		Location: []*pprofprofile.Location{loc},
 		Sample:   samples,
-	}
+	})
 }

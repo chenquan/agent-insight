@@ -69,7 +69,7 @@ type ListConfig struct {
 }
 
 // List performs a function query analysis on the profile
-func List(p *profile.Profile, config ListConfig) (*ListResult, error) {
+func List(p *Profile, config ListConfig) (*ListResult, error) {
 	if p == nil {
 		return nil, fmt.Errorf("profile is nil")
 	}
@@ -124,7 +124,7 @@ func List(p *profile.Profile, config ListConfig) (*ListResult, error) {
 }
 
 // findMatchingFunctions finds functions matching the pattern and builds their relationships
-func findMatchingFunctions(p *profile.Profile, pattern, exclude *regexp.Regexp, config ListConfig) []FunctionInfo {
+func findMatchingFunctions(p *Profile, pattern, exclude *regexp.Regexp, config ListConfig) []FunctionInfo {
 	valueIndex := config.ValueType.Index
 
 	// Build location -> function name mapping
@@ -247,7 +247,7 @@ func findMatchingFunctions(p *profile.Profile, pattern, exclude *regexp.Regexp, 
 }
 
 // buildCallRelationship builds a call relationship from a location
-func buildCallRelationship(loc *profile.Location, value int64, p *profile.Profile) CallRelationship {
+func buildCallRelationship(loc *profile.Location, value int64, p *Profile) CallRelationship {
 	rel := CallRelationship{}
 
 	if len(loc.Line) > 0 && loc.Line[0].Function != nil {
@@ -295,7 +295,7 @@ func extractSymbolInfoForLocation(loc *profile.Location, info *FunctionInfo) {
 }
 
 // calculateTotalValue calculates total value across all samples
-func calculateTotalValue(p *profile.Profile, valueIndex int) int64 {
+func calculateTotalValue(p *Profile, valueIndex int) int64 {
 	total := int64(0)
 	for _, sample := range p.Sample {
 		if valueIndex < len(sample.Value) {

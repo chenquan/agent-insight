@@ -7,7 +7,7 @@ import (
 )
 
 // buildComplexProfile creates a profile with multiple functions and call stacks
-func buildComplexProfile(t *testing.T) *pprofprofile.Profile {
+func buildComplexProfile(t *testing.T) *Profile {
 	t.Helper()
 
 	funcs := []*pprofprofile.Function{
@@ -28,7 +28,7 @@ func buildComplexProfile(t *testing.T) *pprofprofile.Profile {
 		{ID: 5, Mapping: m, Address: 0x1500, Line: []pprofprofile.Line{{Function: funcs[4], Line: 88}}},
 	}
 
-	p := &pprofprofile.Profile{
+	raw := &pprofprofile.Profile{
 		PeriodType:    &pprofprofile.ValueType{Type: "cpu", Unit: "nanoseconds"},
 		Period:        10000000,
 		DurationNanos: 30e9,
@@ -43,7 +43,7 @@ func buildComplexProfile(t *testing.T) *pprofprofile.Profile {
 			{Location: []*pprofprofile.Location{locs[0], locs[1]}, Value: []int64{100}},
 		},
 	}
-	return p
+	return NewProfile(raw)
 }
 
 func TestIntegrationAnalyzeFullFlow(t *testing.T) {
